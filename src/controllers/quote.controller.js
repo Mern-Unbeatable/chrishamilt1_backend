@@ -1,0 +1,63 @@
+const asyncHandler = require("../utils/asyncHandler");
+const { success, paginated } = require("../utils/apiResponse");
+const quoteService = require("../services/quote.service");
+const bookingService = require("../services/booking.service");
+
+const createQuote = asyncHandler(async (req, res) => {
+  const quote = await quoteService.createQuote(req.user.id, req.params.id, req.body);
+  return success(res, {
+    statusCode: 201,
+    message: "Quote submitted successfully",
+    data: quote,
+  });
+});
+
+const listJobQuotes = asyncHandler(async (req, res) => {
+  const quotes = await quoteService.listJobQuotes(req.params.id, req.user);
+  return success(res, { message: "Job quotes fetched", data: quotes });
+});
+
+const getMyQuotes = asyncHandler(async (req, res) => {
+  const result = await quoteService.getMyQuotes(req.user.id, req.query);
+  return paginated(res, {
+    message: "My quotes fetched",
+    data: result.quotes,
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+  });
+});
+
+const getQuote = asyncHandler(async (req, res) => {
+  const quote = await quoteService.getQuoteById(req.params.id, req.user);
+  return success(res, { message: "Quote details", data: quote });
+});
+
+const updateQuote = asyncHandler(async (req, res) => {
+  const quote = await quoteService.updateQuote(req.params.id, req.user.id, req.body);
+  return success(res, { message: "Quote updated", data: quote });
+});
+
+const withdrawQuote = asyncHandler(async (req, res) => {
+  const quote = await quoteService.withdrawQuote(req.params.id, req.user.id);
+  return success(res, { message: "Quote withdrawn", data: quote });
+});
+
+const hireQuote = asyncHandler(async (req, res) => {
+  const booking = await bookingService.hireQuote(req.user.id, req.params.id);
+  return success(res, {
+    statusCode: 201,
+    message: "Tradesman hired successfully",
+    data: booking,
+  });
+});
+
+module.exports = {
+  createQuote,
+  listJobQuotes,
+  getMyQuotes,
+  getQuote,
+  updateQuote,
+  withdrawQuote,
+  hireQuote,
+};
