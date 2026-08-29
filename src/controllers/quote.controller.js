@@ -1,5 +1,5 @@
 const asyncHandler = require("../utils/asyncHandler");
-const { success, paginated } = require("../utils/apiResponse");
+const { success } = require("../utils/apiResponse");
 const quoteService = require("../services/quote.service");
 const bookingService = require("../services/booking.service");
 
@@ -19,12 +19,16 @@ const listJobQuotes = asyncHandler(async (req, res) => {
 
 const getMyQuotes = asyncHandler(async (req, res) => {
   const result = await quoteService.getMyQuotes(req.user.id, req.query);
-  return paginated(res, {
+  return res.status(200).json({
+    success: true,
     message: "My quotes fetched",
-    data: result.quotes,
-    page: result.page,
-    limit: result.limit,
     total: result.total,
+    data: result.quotes,
+    pagination: {
+      page: result.page,
+      limit: result.limit,
+      totalPages: Math.ceil(result.total / result.limit) || 0,
+    },
   });
 });
 

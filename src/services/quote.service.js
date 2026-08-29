@@ -246,17 +246,31 @@ const listJobQuotes = async (jobId, viewer) => {
   if (!job) {
     throw new ApiError(404, "Job not found");
   }
-  if (viewer.role !== "ADMIN" && viewer.id !== job.customerId) {
-    throw new ApiError(403, "You can only view quotes on your own jobs");
+
+  const isAdmin = viewer.role === "ADMIN";
+  const isOwner = viewer.id === job.customerId;
+  const isTradesman = viewer.role === "TRADESMAN";
+
+  if (!isAdmin && !isOwner && !isTradesman) {
+    throw new ApiError(403, "You cannot view quotes on this job");
   }
 
   const quotes = await prisma.quote.findMany({
-    where: { jobId, status: { not: "WITHDRAWN" } },
+    where: {
+      jobId,
+      status: { not: "WITHDRAWN" },
+      ...(isTradesman && !isAdmin && !isOwner ? { tradesmanId: viewer.id } : {}),
+    },
     orderBy: { createdAt: "desc" },
     include: quoteInclude,
   });
 
-  return quotes.map((quote) => serializeQuote(quote, { preview: true }));
+  return quotes.map((quote) =>
+    serializeQuote(quote, {
+      preview: true,
+      includeCustomerContact: isTradesman && quote.tradesmanId === viewer.id,
+    })
+  );
 };
 
 const getQuoteById = async (quoteId, viewer) => {

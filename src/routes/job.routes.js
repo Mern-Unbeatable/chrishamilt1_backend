@@ -21,7 +21,7 @@ router.get("/mine", authenticate, authorize("USER", "ADMIN"), jobController.getM
 router.get(
   "/:id/quotes",
   authenticate,
-  authorize("USER", "ADMIN"),
+  authorize("USER", "TRADESMAN", "ADMIN"),
   jobIdValidator,
   validate,
   quoteController.listJobQuotes
