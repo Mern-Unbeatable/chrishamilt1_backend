@@ -1,3 +1,4 @@
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -8,7 +9,12 @@ const { notFound, errorHandler } = require("./middlewares/error.middleware");
 
 const app = express();
 
-app.use(helmet());
+app.set("trust proxy", 1);
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(
   cors({
     origin: env.corsOrigin === "*" ? true : env.corsOrigin.split(","),
@@ -37,6 +43,7 @@ app.get("/health", (req, res) => {
   });
 });
 
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 app.use("/api", routes);
 
 app.use(notFound);

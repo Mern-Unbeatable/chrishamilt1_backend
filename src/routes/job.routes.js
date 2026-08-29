@@ -11,6 +11,8 @@ const {
   browseJobsValidator,
 } = require("../middlewares/validators/job.validator");
 const { createQuoteValidator } = require("../middlewares/validators/quote.validator");
+const { uploadJobImages } = require("../middlewares/upload.middleware");
+const { parseJobForm, parseQuoteForm } = require("../middlewares/parseJobForm.middleware");
 
 const router = express.Router();
 
@@ -28,6 +30,8 @@ router.post(
   "/:id/quotes",
   authenticate,
   authorize("TRADESMAN"),
+  uploadJobImages,
+  parseQuoteForm,
   jobIdValidator,
   createQuoteValidator,
   validate,
@@ -39,6 +43,8 @@ router.post(
   "/",
   authenticate,
   authorize("USER"),
+  uploadJobImages,
+  parseJobForm,
   createJobValidator,
   validate,
   jobController.createJob
@@ -48,6 +54,8 @@ router.put(
   "/:id",
   authenticate,
   authorize("USER", "ADMIN"),
+  uploadJobImages,
+  parseJobForm,
   updateJobValidator,
   validate,
   jobController.updateJob

@@ -19,4 +19,6 @@ module.exports = {
   jwtRememberExpiresIn: process.env.JWT_REMEMBER_EXPIRES_IN || "40d",
   bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
   corsOrigin: process.env.CORS_ORIGIN || "*",
+  publicBaseUrl:
+    process.env.PUBLIC_BASE_URL || "https://tradesinloop-backend.maktechgroup.tech",
 };

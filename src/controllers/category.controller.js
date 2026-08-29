@@ -4,7 +4,12 @@ const categoryService = require("../services/category.service");
 
 const listCategories = asyncHandler(async (req, res) => {
   const categories = await categoryService.listCategories();
-  return success(res, { message: "Categories fetched", data: categories });
+  return res.status(200).json({
+    success: true,
+    message: "Categories fetched",
+    totalCategories: categories.length,
+    data: categories,
+  });
 });
 
 const createCategory = asyncHandler(async (req, res) => {

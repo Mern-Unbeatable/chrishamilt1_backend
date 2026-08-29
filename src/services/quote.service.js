@@ -93,8 +93,11 @@ const createQuote = async (tradesmanId, jobId, payload) => {
   const tokenCost = resolveTokenCost(job);
   const images = payload.images || [];
 
-  const quote = await prisma.$transaction(async (tx) => {
-    const tradesman = await tx.user.findUnique({ where: { id: tradesmanId } });
+  const created = await prisma.$transaction(async (tx) => {
+    const tradesman = await tx.user.findUnique({
+      where: { id: tradesmanId },
+      select: { tokenBalance: true },
+    });
     if (tradesman.tokenBalance < tokenCost) {
       throw new ApiError(
         400,
@@ -123,13 +126,21 @@ const createQuote = async (tradesmanId, jobId, payload) => {
         amount: payload.amount,
         estimatedDuration: payload.estimatedDuration,
         startDate: new Date(payload.startDate),
-        materialsIncluded: Boolean(payload.materialsIncluded),
+        materialsIncluded:
+          payload.materialsIncluded === undefined
+            ? false
+            : Boolean(payload.materialsIncluded),
         warranty: payload.warranty || null,
         proposal: payload.proposal || "",
         images: images.length ? { create: images.map((url) => ({ url })) } : undefined,
       },
-      include: quoteInclude,
+      select: { id: true },
     });
+  });
+
+  const quote = await prisma.quote.findUnique({
+    where: { id: created.id },
+    include: quoteInclude,
   });
 
   return serializeQuote(quote, { includeCustomerContact: true });

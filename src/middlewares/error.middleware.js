@@ -22,6 +22,17 @@ const errorHandler = (err, req, res, next) => {
     message = "Record not found";
   }
 
+  if (err.name === "MulterError") {
+    statusCode = 400;
+    if (err.code === "LIMIT_FILE_SIZE") {
+      message = "Each image must be 5MB or smaller";
+    } else if (err.code === "LIMIT_FILE_COUNT") {
+      message = "You can upload a maximum of 10 images";
+    } else {
+      message = err.message;
+    }
+  }
+
   const payload = {
     success: false,
     message,

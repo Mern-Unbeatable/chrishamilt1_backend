@@ -8,6 +8,8 @@ const {
   quoteIdValidator,
   listQuotesValidator,
 } = require("../middlewares/validators/quote.validator");
+const { uploadJobImages } = require("../middlewares/upload.middleware");
+const { parseQuoteForm } = require("../middlewares/parseJobForm.middleware");
 
 const router = express.Router();
 
@@ -26,6 +28,8 @@ router.put(
   "/:id",
   authenticate,
   authorize("TRADESMAN"),
+  uploadJobImages,
+  parseQuoteForm,
   updateQuoteValidator,
   validate,
   quoteController.updateQuote

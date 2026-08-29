@@ -4,7 +4,7 @@ const { toSlug } = require("../utils/slug");
 
 const listCategories = async () => {
   return prisma.category.findMany({
-    orderBy: { name: "asc" },
+    orderBy: { createdAt: "desc" },
     include: { _count: { select: { jobs: true } } },
   });
 };
