@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/apiError");
 const { toNumber } = require("../utils/user");
 const { serializeTradesman, serializeCustomer } = require("../utils/serialize");
+const { ensureConversation } = require("./conversation.service");
 
 const bookingInclude = {
   job: {
@@ -131,6 +132,12 @@ const hireQuote = async (customerId, quoteId) => {
       where: { id: created.id },
       include: bookingInclude,
     });
+  });
+
+  await ensureConversation({
+    customerId,
+    tradesmanId: quote.tradesmanId,
+    jobId: quote.jobId,
   });
 
   return serializeBooking(booking, { includeCustomerContact: true });

@@ -70,4 +70,13 @@ router.patch(
   jobController.cancelJob
 );
 
+router.delete(
+  "/:id",
+  authenticate,
+  authorize("USER", "ADMIN"),
+  jobIdValidator,
+  validate,
+  jobController.deleteJob
+);
+
 module.exports = router;

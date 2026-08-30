@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/apiError");
 const { toNumber } = require("../utils/user");
 const { serializeTradesman, serializeCustomer } = require("../utils/serialize");
+const { ensureConversation } = require("./conversation.service");
 
 const quoteInclude = {
   images: true,
@@ -141,6 +142,12 @@ const createQuote = async (tradesmanId, jobId, payload) => {
   const quote = await prisma.quote.findUnique({
     where: { id: created.id },
     include: quoteInclude,
+  });
+
+  await ensureConversation({
+    customerId: job.customerId,
+    tradesmanId,
+    jobId,
   });
 
   return serializeQuote(quote, { includeCustomerContact: true });

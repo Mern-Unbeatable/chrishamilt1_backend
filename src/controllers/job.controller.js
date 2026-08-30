@@ -48,6 +48,11 @@ const cancelJob = asyncHandler(async (req, res) => {
   return success(res, { message: "Job cancelled", data: job });
 });
 
+const deleteJob = asyncHandler(async (req, res) => {
+  const result = await jobService.deleteJob(req.params.id, req.user);
+  return success(res, { message: "Job deleted", data: result });
+});
+
 module.exports = {
   createJob,
   browseJobs,
@@ -55,4 +60,5 @@ module.exports = {
   getMyJobs,
   updateJob,
   cancelJob,
+  deleteJob,
 };

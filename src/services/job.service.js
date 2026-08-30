@@ -339,6 +339,34 @@ const cancelJob = async (id, actor) => {
   return serializeJob(updated, { includeContact: true });
 };
 
+const deleteJob = async (id, actor) => {
+  const job = await prisma.job.findUnique({ where: { id } });
+  if (!job) {
+    throw new ApiError(404, "Job not found");
+  }
+  if (actor.role !== "ADMIN" && job.customerId !== actor.id) {
+    throw new ApiError(403, "You can only delete your own job posts");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.conversation.updateMany({
+      where: { jobId: id },
+      data: { jobId: null },
+    });
+    await tx.tokenUsage.updateMany({
+      where: { jobId: id },
+      data: { jobId: null },
+    });
+    await tx.earning.deleteMany({ where: { jobId: id } });
+    await tx.review.deleteMany({ where: { jobId: id } });
+    await tx.booking.deleteMany({ where: { jobId: id } });
+    await tx.quote.deleteMany({ where: { jobId: id } });
+    await tx.job.delete({ where: { id } });
+  });
+
+  return { id };
+};
+
 module.exports = {
   createJob,
   browseJobs,
@@ -346,4 +374,5 @@ module.exports = {
   getMyJobs,
   updateJob,
   cancelJob,
+  deleteJob,
 };

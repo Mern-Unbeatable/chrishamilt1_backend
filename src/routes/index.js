@@ -8,6 +8,7 @@ const quoteRoutes = require("./quote.routes");
 const bookingRoutes = require("./booking.routes");
 const reviewRoutes = require("./review.routes");
 const tradesmanRoutes = require("./tradesman.routes");
+const conversationRoutes = require("./conversation.routes");
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.use("/quotes", quoteRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/tradesman", tradesmanRoutes);
+router.use("/conversations", conversationRoutes);
 router.use("/admin", adminRoutes);
 
 module.exports = router;

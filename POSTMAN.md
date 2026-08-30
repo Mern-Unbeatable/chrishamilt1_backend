@@ -26,6 +26,7 @@ npm run dev
 | `reviewId` | *(copy after review)* |
 | `tradesmanId` | *(copy from tradesman register/login)* |
 | `userId` | *(copy from user register/login)* |
+| `conversationId` | *(copy after starting a chat)* |
 
 3. For every protected request:
    - **Authorization** → Type: `Bearer Token`
@@ -51,7 +52,8 @@ Authorization: Bearer {{userToken}}
 7. User views quotes → hires → save `bookingId`
 8. Tradesman updates job: `IN_PROGRESS` then `COMPLETED`
 9. User leaves a review → tradesman replies
-10. Check dashboard, bookings, my jobs, admin lists
+10. Open chat (quote already created a conversation) → user and tradesman send messages
+11. Check dashboard, bookings, my jobs, admin lists
 
 ---
 
@@ -310,13 +312,121 @@ Save `data.id` → `jobId`
 
 JSON raw body still works if you send image URLs instead of files.
 
-### GET `/api/jobs` — Browse (public)
+### GET `/api/jobs` — Browse / Filter Job Opportunities (public)
+
+No auth. Use this for the **Filter Job Opportunities** screen.
+
+First load categories for the Trade Category dropdown:
+
+```
+GET {{baseUrl}}/api/categories
+```
+
+Copy a category `slug` (example: `plumbing`) or `id`.
+
+Then browse jobs:
+
+```
+GET {{baseUrl}}/api/jobs
+```
+
+`pagination.total` is the **Showing X jobs** count.
+
+All query params are optional. Combine any of them.
+
+| UI filter | Query param | Notes |
+|---|---|---|
+| Trade Category | `category` | slug, name, or category id (`plumbing`, `Electrical`, or UUID) |
+| Location | `location` | partial match, case-insensitive (`London`) |
+| Budget Range | `minBudget` + `maxBudget` | see ranges below |
+| Search | `search` | matches title, description, location |
+| Urgency | `urgency` | `LOW` \| `MEDIUM` \| `HIGH` |
+| Page | `page` | default `1` |
+| Per page | `limit` | default `10` |
+
+**Budget Range dropdown**
+
+| UI option | Request |
+|---|---|
+| Any Budget | omit both |
+| Under £1,000 | `?maxBudget=1000` |
+| £1,000–£5,000 | `?minBudget=1000&maxBudget=5000` |
+| £5,000–£10,000 | `?minBudget=5000&maxBudget=10000` |
+| £10,000+ | `?minBudget=10000` |
+
+**Test requests**
+
+All jobs (Any Budget, All Trade Categories):
+
+```
+GET {{baseUrl}}/api/jobs?page=1&limit=10
+```
+
+Trade category only:
+
+```
+GET {{baseUrl}}/api/jobs?category=plumbing
+```
+
+Location only:
+
+```
+GET {{baseUrl}}/api/jobs?location=London
+```
+
+Budget: Under £1,000
+
+```
+GET {{baseUrl}}/api/jobs?maxBudget=1000
+```
+
+Budget: £1,000–£5,000
+
+```
+GET {{baseUrl}}/api/jobs?minBudget=1000&maxBudget=5000
+```
+
+Budget: £5,000–£10,000
+
+```
+GET {{baseUrl}}/api/jobs?minBudget=5000&maxBudget=10000
+```
+
+Budget: £10,000+
+
+```
+GET {{baseUrl}}/api/jobs?minBudget=10000
+```
+
+All three filters together (category + location + budget):
+
+```
+GET {{baseUrl}}/api/jobs?category=plumbing&location=London&minBudget=1000&maxBudget=5000&page=1&limit=10
+```
+
+Full example with search and urgency:
 
 ```
 GET {{baseUrl}}/api/jobs?category=plumbing&location=London&search=Bathroom&minBudget=1000&maxBudget=5000&urgency=HIGH&page=1&limit=10
 ```
 
-All query params are optional.
+Expected shape:
+
+```json
+{
+  "success": true,
+  "message": "Jobs fetched",
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 11,
+    "totalPages": 2
+  }
+}
+```
+
+`pagination.total` = Showing **11 jobs**.
 
 ### GET `/api/jobs/mine` — User
 
@@ -364,6 +474,34 @@ PATCH {{baseUrl}}/api/jobs/{{jobId}}/cancel
 ```
 
 Use a different job for cancel tests so you can still run the hire flow.
+
+Sets `status` to `CANCELLED`. The job stays in `GET /api/jobs/mine`.
+
+### DELETE `/api/jobs/:id` — Owner / Admin (hard delete)
+
+Bearer: `{{userToken}}`
+
+```
+DELETE {{baseUrl}}/api/jobs/{{jobId}}
+```
+
+Permanently removes the job. It will not appear in My Job Post after this.
+
+Use a spare job for this test. Do not delete the job you need for quotes / hire / review.
+
+Expected:
+
+```json
+{
+  "success": true,
+  "message": "Job deleted",
+  "data": {
+    "id": "{{jobId}}"
+  }
+}
+```
+
+Then `GET /api/jobs/mine` no longer includes that job. `GET /api/jobs/{{jobId}}` returns 404.
 
 ---
 
@@ -661,14 +799,116 @@ Adds tokens (does not replace the balance).
 
 ---
 
+## 11. Live chat
+
+User and tradesman can message each other. A conversation is created automatically when a tradesman sends a quote (or when a user hires). Both sides can also start a chat manually.
+
+All chat routes need a Bearer token. Use `{{userToken}}` or `{{tradesmanToken}}`.
+
+### POST `/api/conversations` — Start / find chat
+
+User starts a chat with a tradesman:
+
+```
+POST {{baseUrl}}/api/conversations
+```
+
+Bearer: `{{userToken}}`
+
+```json
+{
+  "tradesmanId": "{{tradesmanId}}",
+  "jobId": "{{jobId}}"
+}
+```
+
+Tradesman starts a chat with a customer:
+
+Bearer: `{{tradesmanToken}}`
+
+```json
+{
+  "customerId": "{{userId}}",
+  "jobId": "{{jobId}}"
+}
+```
+
+`jobId` is optional. Save `data.id` → `conversationId`.
+
+### GET `/api/conversations` — Inbox
+
+```
+GET {{baseUrl}}/api/conversations?page=1&limit=20
+```
+
+`total` is at the top. Each item includes `lastMessage`, `unreadCount`, and `otherParty`.
+
+### GET `/api/conversations/:id`
+
+```
+GET {{baseUrl}}/api/conversations/{{conversationId}}
+```
+
+### GET `/api/conversations/:id/messages`
+
+```
+GET {{baseUrl}}/api/conversations/{{conversationId}}/messages?page=1&limit=30
+```
+
+Newest messages first. `total` is at the top.
+
+### POST `/api/conversations/:id/messages` — Send
+
+```
+POST {{baseUrl}}/api/conversations/{{conversationId}}/messages
+```
+
+```json
+{
+  "content": "Hi, when can you start the bathroom job?"
+}
+```
+
+Then reply with the other token:
+
+```json
+{
+  "content": "I can start Monday morning if that works."
+}
+```
+
+### PATCH `/api/conversations/:id/read`
+
+```
+PATCH {{baseUrl}}/api/conversations/{{conversationId}}/read
+```
+
+Marks the other person's messages as read.
+
+### Socket.IO (live)
+
+URL: `{{baseUrl}}`  
+Auth: `auth: { token: "<jwt>" }`
+
+| Client sends | Server emits |
+|---|---|
+| `conversation:join` `{ conversationId }` | — |
+| `message:send` `{ conversationId, content }` | `message:new` |
+| `message:read` `{ conversationId }` | `message:read` |
+| `typing:start` / `typing:stop` | `typing` |
+
+REST send also emits `message:new` so a connected client still gets live updates.
+
+---
+
 ## Quick role map
 
 | Who | Can do |
 |---|---|
 | Anyone | Welcome, health, browse jobs, list categories, public reviews |
-| USER | Post jobs, view own quotes, hire, bookings, review |
-| TRADESMAN | Quote, my quotes, my jobs, dashboard, reply to reviews |
-| ADMIN | Categories CRUD, customers/tradesmen lists, suspend, grant tokens |
+| USER | Post jobs, view own quotes, hire, bookings, review, chat with tradesman |
+| TRADESMAN | Quote, my quotes, my jobs, dashboard, reply to reviews, chat with customer |
+| ADMIN | Categories CRUD, customers/tradesmen lists, suspend, grant tokens, view chats |
 
 ---
 
