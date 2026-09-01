@@ -115,4 +115,175 @@ const getDashboard = async (tradesmanId) => {
   };
 };
 
-module.exports = { getDashboard };
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const startOfDay = (date = new Date()) => {
+  const point = new Date(date);
+  point.setHours(0, 0, 0, 0);
+  return point;
+};
+
+const startOfWeek = (date = new Date()) => {
+  const point = startOfDay(date);
+  const day = point.getDay();
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  point.setDate(point.getDate() - daysFromMonday);
+  return point;
+};
+
+const startOfMonth = (date = new Date()) => {
+  const point = startOfDay(date);
+  point.setDate(1);
+  return point;
+};
+
+const addDays = (date, days) => {
+  const point = new Date(date);
+  point.setDate(point.getDate() + days);
+  return point;
+};
+
+const addMonths = (date, months) => {
+  return new Date(date.getFullYear(), date.getMonth() + months, 1);
+};
+
+const money = (value) => Math.round((toNumber(value) || 0) * 100) / 100;
+
+const percentChange = (current, previous) => {
+  if (!previous) {
+    return current > 0 ? 100 : 0;
+  }
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+};
+
+const sumEarnings = async (tradesmanId, from, to) => {
+  const result = await prisma.earning.aggregate({
+    where: {
+      tradesmanId,
+      createdAt: {
+        gte: from,
+        ...(to ? { lt: to } : {}),
+      },
+    },
+    _sum: { amount: true },
+  });
+  return money(result._sum.amount);
+};
+
+const getEarnings = async (tradesmanId, query = {}) => {
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const weekStart = startOfWeek(now);
+  const lastWeekStart = addDays(weekStart, -7);
+  const monthStart = startOfMonth(now);
+  const lastMonthStart = addMonths(monthStart, -1);
+  const chartFrom = addMonths(monthStart, -11);
+
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  const [
+    today,
+    thisWeek,
+    lastWeek,
+    thisMonth,
+    lastMonth,
+    lifetimeResult,
+    completedJobs,
+    chartRows,
+    recentRows,
+    recentTotal,
+  ] = await Promise.all([
+    sumEarnings(tradesmanId, todayStart),
+    sumEarnings(tradesmanId, weekStart),
+    sumEarnings(tradesmanId, lastWeekStart, weekStart),
+    sumEarnings(tradesmanId, monthStart),
+    sumEarnings(tradesmanId, lastMonthStart, monthStart),
+    prisma.earning.aggregate({
+      where: { tradesmanId },
+      _sum: { amount: true },
+    }),
+    prisma.booking.count({ where: { tradesmanId, status: "COMPLETED" } }),
+    prisma.earning.findMany({
+      where: { tradesmanId, createdAt: { gte: chartFrom } },
+      select: { amount: true, createdAt: true },
+    }),
+    prisma.earning.findMany({
+      where: { tradesmanId },
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        job: { select: { id: true, jobCode: true, title: true } },
+      },
+    }),
+    prisma.earning.count({ where: { tradesmanId } }),
+  ]);
+
+  const lifetime = money(lifetimeResult._sum.amount);
+  const averageJobValue = completedJobs ? money(lifetime / completedJobs) : 0;
+
+  const months = lastTwelveMonthKeys();
+  const earningsByMonth = Object.fromEntries(months.map((key) => [key, 0]));
+  chartRows.forEach((row) => {
+    const key = monthKey(row.createdAt);
+    if (key in earningsByMonth) {
+      earningsByMonth[key] += money(row.amount);
+    }
+  });
+
+  return {
+    summary: {
+      today,
+      thisWeek,
+      thisWeekChangePercent: percentChange(thisWeek, lastWeek),
+      thisMonth,
+      thisMonthChangePercent: percentChange(thisMonth, lastMonth),
+      lifetime,
+    },
+    revenue: {
+      averageJobValue,
+      completedJobs,
+    },
+    payoutNote: "Payouts land 2 working days after customer approval.",
+    charts: {
+      monthlyRevenue: months.map((key) => {
+        const monthIndex = Number(key.slice(5, 7)) - 1;
+        return {
+          month: key,
+          label: MONTH_LABELS[monthIndex],
+          amount: money(earningsByMonth[key]),
+        };
+      }),
+    },
+    recent: {
+      items: recentRows.map((row) => ({
+        id: row.id,
+        jobId: row.jobId,
+        jobCode: row.job?.jobCode || null,
+        jobTitle: row.job?.title || null,
+        amount: money(row.amount),
+        createdAt: row.createdAt,
+      })),
+      total: recentTotal,
+      page,
+      limit,
+    },
+  };
+};
+
+module.exports = { getDashboard, getEarnings };

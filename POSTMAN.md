@@ -650,6 +650,67 @@ Bearer: `{{tradesmanToken}}`
 GET {{baseUrl}}/api/tradesman/dashboard
 ```
 
+### GET `/api/tradesman/earnings`
+
+Bearer: `{{tradesmanToken}}`
+
+```
+GET {{baseUrl}}/api/tradesman/earnings?page=1&limit=10
+```
+
+Tradesman only. Use this for the **Earnings** page.
+
+| UI | Field |
+|---|---|
+| Today | `summary.today` |
+| This week | `summary.thisWeek` |
+| Week +% | `summary.thisWeekChangePercent` (vs last week) |
+| This month | `summary.thisMonth` |
+| Month +% | `summary.thisMonthChangePercent` (vs last month) |
+| Lifetime | `summary.lifetime` |
+| Average job value | `revenue.averageJobValue` |
+| Completed jobs | `revenue.completedJobs` |
+| Year line chart | `charts.monthlyRevenue` (last 12 months) |
+| Payout line | `payoutNote` |
+| Recent payouts / export rows | `recent.items` |
+
+Week starts on **Monday**. Completing a job (`PATCH /api/tradesman/jobs/:id/status` → `COMPLETED`) creates the earning row.
+
+Expected shape:
+
+```json
+{
+  "success": true,
+  "message": "Earnings fetched",
+  "data": {
+    "summary": {
+      "today": 420,
+      "thisWeek": 2310,
+      "thisWeekChangePercent": 8,
+      "thisMonth": 8320,
+      "thisMonthChangePercent": 21,
+      "lifetime": 126480
+    },
+    "revenue": {
+      "averageJobValue": 972,
+      "completedJobs": 87
+    },
+    "payoutNote": "Payouts land 2 working days after customer approval.",
+    "charts": {
+      "monthlyRevenue": [
+        { "month": "2025-09", "label": "Sep", "amount": 3200 }
+      ]
+    },
+    "recent": {
+      "items": [],
+      "total": 0,
+      "page": 1,
+      "limit": 10
+    }
+  }
+}
+```
+
 ### GET `/api/tradesman/jobs`
 
 Bearer: `{{tradesmanToken}}`
@@ -748,6 +809,38 @@ PATCH {{baseUrl}}/api/reviews/{{reviewId}}/reply
 ## 10. Admin
 
 All require Bearer: `{{adminToken}}`
+
+### GET `/api/admin/dashboard`
+
+```
+GET {{baseUrl}}/api/admin/dashboard
+```
+
+Admin only. Use this for the admin **Dashboard** screen.
+
+| UI card | Field |
+|---|---|
+| Total Customers | `cards.totalCustomers` |
+| Total Tradesmen | `cards.totalTradesmen` |
+| Active Tradesmen | `cards.activeTradesmen` |
+| Low Token Accounts | `cards.lowTokenAccounts` (balance below `cards.lowTokenThreshold`, default 20) |
+| Jobs Posted | `cards.jobsPosted` |
+| Open Jobs | `cards.openJobs` |
+| Completed Jobs | `cards.completedJobs` |
+| Quotes Today | `cards.quotesToday` |
+| Token Sales Today | `cards.tokenSalesToday` |
+| Monthly Revenue | `cards.monthlyRevenue` |
+| Total Tokens Sold | `cards.totalTokensSold` |
+| Tokens Used | `cards.tokensUsed` |
+
+| UI chart | Field |
+|---|---|
+| Monthly earnings (paid invoices) | `charts.monthlyEarnings` |
+| Jobs completed (monthly volume) | `charts.jobsCompleted` |
+| Customer & Tradesman growth | `charts.growth` (`newCustomers` / `newTradesmen` plus running `customers` / `tradesmen`) |
+| Top Token Buyers | `topTokenBuyers` (`rank`, `name`, `amount`, `tokens`) |
+
+Token sales / revenue / top buyers use **completed** token purchases. Those stay `0` until tradesmen buy packages.
 
 ### GET `/api/admin/customers`
 
@@ -907,8 +1000,8 @@ REST send also emits `message:new` so a connected client still gets live updates
 |---|---|
 | Anyone | Welcome, health, browse jobs, list categories, public reviews |
 | USER | Post jobs, view own quotes, hire, bookings, review, chat with tradesman |
-| TRADESMAN | Quote, my quotes, my jobs, dashboard, reply to reviews, chat with customer |
-| ADMIN | Categories CRUD, customers/tradesmen lists, suspend, grant tokens, view chats |
+| TRADESMAN | Quote, my quotes, my jobs, dashboard, earnings, reply to reviews, chat with customer |
+| ADMIN | Dashboard, categories CRUD, customers/tradesmen lists, suspend, grant tokens, view chats |
 
 ---
 

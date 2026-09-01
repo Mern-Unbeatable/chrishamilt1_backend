@@ -1,6 +1,7 @@
 const express = require("express");
 const { body, param } = require("express-validator");
 const userController = require("../controllers/user.controller");
+const adminController = require("../controllers/admin.controller");
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
 const { validate } = require("../middlewares/validate.middleware");
@@ -9,6 +10,7 @@ const router = express.Router();
 
 router.use(authenticate, authorize("ADMIN"));
 
+router.get("/dashboard", adminController.getDashboard);
 router.get("/customers", userController.listCustomers);
 router.get("/tradesmen", userController.listTradesmen);
 router.patch(

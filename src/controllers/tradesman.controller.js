@@ -8,6 +8,11 @@ const getDashboard = asyncHandler(async (req, res) => {
   return success(res, { message: "Dashboard fetched", data: dashboard });
 });
 
+const getEarnings = asyncHandler(async (req, res) => {
+  const earnings = await tradesmanService.getEarnings(req.user.id, req.query);
+  return success(res, { message: "Earnings fetched", data: earnings });
+});
+
 const getMyAssignedJobs = asyncHandler(async (req, res) => {
   const result = await bookingService.getTradesmanJobs(req.user.id, req.query);
   return paginated(res, {
@@ -30,6 +35,7 @@ const updateAssignedJobStatus = asyncHandler(async (req, res) => {
 
 module.exports = {
   getDashboard,
+  getEarnings,
   getMyAssignedJobs,
   updateAssignedJobStatus,
 };
