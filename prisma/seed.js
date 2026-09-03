@@ -50,25 +50,44 @@ const TOKEN_PACKAGES = [
 
 const TOKEN_RULES = [
   {
-    name: "Small job",
+    name: "Under £1,000",
     minBudget: 0,
     maxBudget: 999,
-    tokenCost: 8,
-    description: "Lead cost for jobs under £1,000",
+    tokenCost: 10,
+    description: "Jobs under £1,000",
+    isActive: true,
   },
   {
-    name: "Standard job",
+    name: "£1,000 – £2,000",
     minBudget: 1000,
-    maxBudget: 4999,
-    tokenCost: 14,
-    description: "Lead cost for mid-range jobs",
+    maxBudget: 2000,
+    tokenCost: 20,
+    description: "Jobs from £1,000 to £2,000",
+    isActive: true,
   },
   {
-    name: "Large job",
-    minBudget: 5000,
-    maxBudget: 999999,
-    tokenCost: 25,
-    description: "Lead cost for high-value jobs",
+    name: "£2,000 – £3,000",
+    minBudget: 2001,
+    maxBudget: 3000,
+    tokenCost: 30,
+    description: "Jobs from £2,001 to £3,000",
+    isActive: true,
+  },
+  {
+    name: "£3,000 – £5,000",
+    minBudget: 3001,
+    maxBudget: 5000,
+    tokenCost: 40,
+    description: "Jobs from £3,001 to £5,000",
+    isActive: true,
+  },
+  {
+    name: "Above £5,000",
+    minBudget: 5001,
+    maxBudget: null,
+    tokenCost: 50,
+    description: "Jobs above £5,000",
+    isActive: true,
   },
 ];
 
@@ -102,13 +121,9 @@ async function main() {
     }
   }
 
+  await prisma.tokenRule.deleteMany();
   for (const rule of TOKEN_RULES) {
-    const existing = await prisma.tokenRule.findFirst({
-      where: { name: rule.name },
-    });
-    if (!existing) {
-      await prisma.tokenRule.create({ data: rule });
-    }
+    await prisma.tokenRule.create({ data: rule });
   }
 
   console.log("Seed complete: categories, token packages, and token rules");

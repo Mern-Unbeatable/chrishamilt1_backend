@@ -2,6 +2,7 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/apiError");
 const { nextJobCode } = require("../utils/jobCode");
 const { toNumber } = require("../utils/user");
+const tokenRuleService = require("./tokenRule.service");
 
 const serializeJob = (job, { includeContact = false } = {}) => {
   if (!job) return null;
@@ -46,17 +47,7 @@ const generateJobCode = async () => {
   return nextJobCode(last?.jobCode);
 };
 
-const resolveLeadPrice = async (budgetMax) => {
-  const rule = await prisma.tokenRule.findFirst({
-    where: {
-      minBudget: { lte: budgetMax },
-      maxBudget: { gte: budgetMax },
-    },
-    orderBy: { tokenCost: "asc" },
-  });
-
-  return rule ? rule.tokenCost : 14;
-};
+const resolveLeadPrice = (budgetMax) => tokenRuleService.resolveLeadPrice(budgetMax);
 
 const canViewContact = (viewer, job) => {
   if (!viewer) return false;

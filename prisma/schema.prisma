@@ -333,12 +333,14 @@ model TokenRule {
   id          String   @id @default(uuid())
   name        String
   minBudget   Decimal  @db.Decimal(12, 2)
-  maxBudget   Decimal  @db.Decimal(12, 2)
+  maxBudget   Decimal? @db.Decimal(12, 2)
   tokenCost   Int
   description String?
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([isActive])
   @@map("token_rules")
 }
 

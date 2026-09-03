@@ -28,6 +28,7 @@ npm run dev
 | `userId` | *(copy from user register/login)* |
 | `conversationId` | *(copy after starting a chat)* |
 | `packageId` | *(copy from GET packages)* |
+| `tokenRuleId` | *(copy from GET admin token-rules)* |
 
 3. For every protected request:
    - **Authorization** → Type: `Bearer Token`
@@ -963,6 +964,80 @@ DELETE {{baseUrl}}/api/admin/packages/{{packageId}}
 
 Hard-deletes if unused. If the package already has purchases, it is only deactivated.
 
+### GET `/api/admin/token-rules` — Token deduction rules
+
+Bearer: `{{adminToken}}`
+
+```
+GET {{baseUrl}}/api/admin/token-rules
+```
+
+Seeded defaults (5 ranges):
+
+| Label | Min | Max | Tokens |
+|---|---|---|---|
+| Under £1,000 | 0 | 999 | 10 |
+| £1,000 – £2,000 | 1000 | 2000 | 20 |
+| £2,000 – £3,000 | 2001 | 3000 | 30 |
+| £3,000 – £5,000 | 3001 | 5000 | 40 |
+| Above £5,000 | 5001 | unlimited | 50 |
+
+Use this for the **Token Rules** table. Each row has `name` (label), `budgetRange`, `minBudget`, `maxBudget` (`null` = unlimited / `∞`), `tokenCost`, `status` (`Active` / `Inactive`).
+
+### POST `/api/admin/token-rules` — Add Rule
+
+```
+POST {{baseUrl}}/api/admin/token-rules
+```
+
+```json
+{
+  "name": "Under £1,000",
+  "minBudget": 0,
+  "maxBudget": 999,
+  "tokenCost": 10,
+  "isActive": true
+}
+```
+
+Unlimited max (leave blank in the UI):
+
+```json
+{
+  "name": "£10,000+",
+  "minBudget": 10000,
+  "maxBudget": null,
+  "tokenCost": 40,
+  "isActive": true
+}
+```
+
+Save `data.id` → `tokenRuleId`. Overlapping active ranges return 400.
+
+### PUT `/api/admin/token-rules/:id` — Edit
+
+```
+PUT {{baseUrl}}/api/admin/token-rules/{{tokenRuleId}}
+```
+
+```json
+{
+  "name": "Under £1,000",
+  "minBudget": 0,
+  "maxBudget": 999,
+  "tokenCost": 10,
+  "isActive": true
+}
+```
+
+### DELETE `/api/admin/token-rules/:id`
+
+```
+DELETE {{baseUrl}}/api/admin/token-rules/{{tokenRuleId}}
+```
+
+New jobs use these rules for quote token cost. Old jobs keep their existing `leadPrice`.
+
 ---
 
 ## 11. Token packages / Stripe (tradesman buy)
@@ -1130,7 +1205,7 @@ REST send also emits `message:new` so a connected client still gets live updates
 | Anyone | Welcome, health, browse jobs, list categories, public reviews |
 | USER | Post jobs, view own quotes, hire, bookings, review, chat with tradesman |
 | TRADESMAN | Quote, my quotes, my jobs, dashboard, earnings, buy token packages, reply to reviews, chat with customer |
-| ADMIN | Dashboard, categories CRUD, customers/tradesmen lists, suspend, grant tokens, token packages, view chats |
+| ADMIN | Dashboard, categories, customers/tradesmen, token packages, token rules, suspend, grant tokens, view chats |
 
 ---
 

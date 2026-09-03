@@ -3,6 +3,7 @@ const { body, param } = require("express-validator");
 const userController = require("../controllers/user.controller");
 const adminController = require("../controllers/admin.controller");
 const packageController = require("../controllers/package.controller");
+const tokenRuleController = require("../controllers/tokenRule.controller");
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
 const { validate } = require("../middlewares/validate.middleware");
@@ -11,6 +12,11 @@ const {
   updatePackageValidator,
   packageIdValidator,
 } = require("../middlewares/validators/package.validator");
+const {
+  createRuleValidator,
+  updateRuleValidator,
+  ruleIdValidator,
+} = require("../middlewares/validators/tokenRule.validator");
 
 const router = express.Router();
 
@@ -55,6 +61,26 @@ router.delete(
   packageIdValidator,
   validate,
   packageController.deletePackage
+);
+
+router.get("/token-rules", tokenRuleController.listRules);
+router.post(
+  "/token-rules",
+  createRuleValidator,
+  validate,
+  tokenRuleController.createRule
+);
+router.put(
+  "/token-rules/:id",
+  updateRuleValidator,
+  validate,
+  tokenRuleController.updateRule
+);
+router.delete(
+  "/token-rules/:id",
+  ruleIdValidator,
+  validate,
+  tokenRuleController.deleteRule
 );
 
 module.exports = router;
