@@ -246,9 +246,31 @@ POST {{baseUrl}}/api/categories
 
 ```json
 {
-  "name": "Kitchen Fitting"
+  "name": "Kitchen Fitting",
+  "icon": "wrench"
 }
 ```
+
+`icon` is required. Store a frontend icon key only (`wrench`, `droplet`, `bolt`). Do not upload icon files. The 500-icon picker stays on the frontend.
+
+`GET /api/categories` now returns `icon` for landing-page chips.
+
+### PUT `/api/categories/:id` — Admin only
+
+Bearer: `{{adminToken}}`
+
+```
+PUT {{baseUrl}}/api/categories/{{categoryId}}
+```
+
+```json
+{
+  "name": "Kitchen Fitting",
+  "icon": "hammer"
+}
+```
+
+Send only the fields you want to change.
 
 ### DELETE `/api/categories/:id` — Admin only
 

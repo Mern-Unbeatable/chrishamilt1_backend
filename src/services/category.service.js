@@ -2,6 +2,11 @@ const prisma = require("../config/prisma");
 const ApiError = require("../utils/apiError");
 const { toSlug } = require("../utils/slug");
 
+const normalizeIcon = (icon) => {
+  if (icon === undefined || icon === null || icon === "") return null;
+  return toSlug(icon);
+};
+
 const listCategories = async () => {
   return prisma.category.findMany({
     orderBy: { createdAt: "desc" },
@@ -9,8 +14,10 @@ const listCategories = async () => {
   });
 };
 
-const createCategory = async (name) => {
+const createCategory = async ({ name, icon }) => {
   const slug = toSlug(name);
+  const iconKey = normalizeIcon(icon);
+
   const existing = await prisma.category.findFirst({
     where: { OR: [{ name }, { slug }] },
   });
@@ -19,7 +26,39 @@ const createCategory = async (name) => {
     throw new ApiError(409, "Category already exists");
   }
 
-  return prisma.category.create({ data: { name, slug } });
+  return prisma.category.create({
+    data: { name, slug, icon: iconKey },
+  });
+};
+
+const updateCategory = async (id, { name, icon }) => {
+  const category = await prisma.category.findUnique({ where: { id } });
+  if (!category) {
+    throw new ApiError(404, "Category not found");
+  }
+
+  const data = {};
+
+  if (name !== undefined) {
+    const slug = toSlug(name);
+    const clash = await prisma.category.findFirst({
+      where: {
+        id: { not: id },
+        OR: [{ name }, { slug }],
+      },
+    });
+    if (clash) {
+      throw new ApiError(409, "Category already exists");
+    }
+    data.name = name;
+    data.slug = slug;
+  }
+
+  if (icon !== undefined) {
+    data.icon = normalizeIcon(icon);
+  }
+
+  return prisma.category.update({ where: { id }, data });
 };
 
 const deleteCategory = async (id) => {
@@ -39,4 +78,4 @@ const deleteCategory = async (id) => {
   await prisma.category.delete({ where: { id } });
 };
 
-module.exports = { listCategories, createCategory, deleteCategory };
+module.exports = { listCategories, createCategory, updateCategory, deleteCategory };

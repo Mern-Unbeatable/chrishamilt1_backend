@@ -5,6 +5,7 @@ const { authorize } = require("../middlewares/role.middleware");
 const { validate } = require("../middlewares/validate.middleware");
 const {
   createCategoryValidator,
+  updateCategoryValidator,
   categoryIdValidator,
 } = require("../middlewares/validators/category.validator");
 
@@ -19,6 +20,15 @@ router.post(
   createCategoryValidator,
   validate,
   categoryController.createCategory
+);
+
+router.put(
+  "/:id",
+  authenticate,
+  authorize("ADMIN"),
+  updateCategoryValidator,
+  validate,
+  categoryController.updateCategory
 );
 
 router.delete(

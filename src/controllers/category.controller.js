@@ -13,7 +13,7 @@ const listCategories = asyncHandler(async (req, res) => {
 });
 
 const createCategory = asyncHandler(async (req, res) => {
-  const category = await categoryService.createCategory(req.body.name);
+  const category = await categoryService.createCategory(req.body);
   return success(res, {
     statusCode: 201,
     message: "Category created",
@@ -21,9 +21,14 @@ const createCategory = asyncHandler(async (req, res) => {
   });
 });
 
+const updateCategory = asyncHandler(async (req, res) => {
+  const category = await categoryService.updateCategory(req.params.id, req.body);
+  return success(res, { message: "Category updated", data: category });
+});
+
 const deleteCategory = asyncHandler(async (req, res) => {
   await categoryService.deleteCategory(req.params.id);
   return success(res, { message: "Category deleted" });
 });
 
-module.exports = { listCategories, createCategory, deleteCategory };
+module.exports = { listCategories, createCategory, updateCategory, deleteCategory };

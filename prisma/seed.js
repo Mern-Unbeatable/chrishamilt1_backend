@@ -5,20 +5,20 @@ const { toSlug } = require("../src/utils/slug");
 const prisma = new PrismaClient();
 
 const CATEGORIES = [
-  "Plumbing",
-  "Electrical",
-  "Roofing",
-  "Carpentry",
-  "Painting",
-  "Cleaning",
-  "Gardening",
-  "Handyman",
-  "Flooring",
-  "Heating",
-  "Building",
-  "Renovation",
-  "Tiling",
-  "Flat Pack",
+  { name: "Plumbing", icon: "droplet" },
+  { name: "Electrical", icon: "bolt" },
+  { name: "Roofing", icon: "home" },
+  { name: "Carpentry", icon: "hammer" },
+  { name: "Painting", icon: "paintbrush" },
+  { name: "Cleaning", icon: "sparkles" },
+  { name: "Gardening", icon: "leaf" },
+  { name: "Handyman", icon: "wrench" },
+  { name: "Flooring", icon: "layers" },
+  { name: "Heating", icon: "flame" },
+  { name: "Building", icon: "hard-hat" },
+  { name: "Renovation", icon: "truck" },
+  { name: "Tiling", icon: "grid" },
+  { name: "Flat Pack", icon: "box" },
 ];
 
 const TOKEN_PACKAGES = [
@@ -70,11 +70,11 @@ const TOKEN_RULES = [
 ];
 
 async function main() {
-  for (const name of CATEGORIES) {
+  for (const { name, icon } of CATEGORIES) {
     await prisma.category.upsert({
       where: { slug: toSlug(name) },
-      update: { name },
-      create: { name, slug: toSlug(name) },
+      update: { name, icon },
+      create: { name, slug: toSlug(name), icon },
     });
   }
 
