@@ -27,6 +27,7 @@ npm run dev
 | `tradesmanId` | *(copy from tradesman register/login)* |
 | `userId` | *(copy from user register/login)* |
 | `conversationId` | *(copy after starting a chat)* |
+| `packageId` | *(copy from GET packages)* |
 
 3. For every protected request:
    - **Authorization** → Type: `Bearer Token`
@@ -912,9 +913,115 @@ PATCH {{baseUrl}}/api/admin/tradesmen/{{tradesmanId}}/tokens
 
 Adds tokens (does not replace the balance).
 
+### GET `/api/admin/packages` — Token packages
+
+```
+GET {{baseUrl}}/api/admin/packages
+```
+
+### POST `/api/admin/packages` — Create package
+
+```
+POST {{baseUrl}}/api/admin/packages
+```
+
+```json
+{
+  "name": "Starter",
+  "price": 30,
+  "tokenQuantity": 100,
+  "description": "Perfect for tradesmen getting started.",
+  "isPopular": false,
+  "stripePriceId": "price_1UBSnvPc4Do23EYoZc37LZnO"
+}
+```
+
+### PUT `/api/admin/packages/:id` — Edit package
+
+```
+PUT {{baseUrl}}/api/admin/packages/{{packageId}}
+```
+
+```json
+{
+  "name": "Starter",
+  "price": 30,
+  "tokenQuantity": 100,
+  "description": "Perfect for tradesmen getting started.",
+  "isPopular": true,
+  "stripePriceId": "price_1UBSnvPc4Do23EYoZc37LZnO"
+}
+```
+
+`isPopular: true` sets the **MOST POPULAR** badge.
+
+### DELETE `/api/admin/packages/:id`
+
+```
+DELETE {{baseUrl}}/api/admin/packages/{{packageId}}
+```
+
+Hard-deletes if unused. If the package already has purchases, it is only deactivated.
+
 ---
 
-## 11. Live chat
+## 11. Token packages / Stripe (tradesman buy)
+
+Anyone can list packages. **Only a tradesman** can pay.
+
+### GET `/api/packages`
+
+```
+GET {{baseUrl}}/api/packages
+```
+
+Returns Starter / Professional / Business for the wallet and pricing page.
+
+### POST `/api/packages/:id/checkout` — Tradesman only
+
+Bearer: `{{tradesmanToken}}`
+
+```
+POST {{baseUrl}}/api/packages/{{packageId}}/checkout
+```
+
+Open `data.checkoutUrl` in the browser and pay with a Stripe test card: `4242 4242 4242 4242`.
+
+You only need this one API. After pay, Stripe hits:
+
+`https://tradesinloop-backend.maktechgroup.tech/api/packages/stripe/success?session_id={CHECKOUT_SESSION_ID}`
+
+That adds tokens, then redirects to:
+
+`https://tradesinloop.maktechgroup.tech/wallet?status=success`
+
+`POST /api/packages/confirm` is optional (safe to call twice).
+
+### POST `/api/packages/confirm` — optional
+
+```
+POST {{baseUrl}}/api/packages/confirm
+```
+
+```json
+{
+  "sessionId": "cs_test_..."
+}
+```
+
+This checks Stripe that the session is `paid`, then adds tokens to the wallet. Safe to call twice.
+
+### GET `/api/tradesman/purchases`
+
+Bearer: `{{tradesmanToken}}`
+
+```
+GET {{baseUrl}}/api/tradesman/purchases?page=1&limit=10
+```
+
+---
+
+## 12. Live chat
 
 User and tradesman can message each other. A conversation is created automatically when a tradesman sends a quote (or when a user hires). Both sides can also start a chat manually.
 
@@ -1022,8 +1129,8 @@ REST send also emits `message:new` so a connected client still gets live updates
 |---|---|
 | Anyone | Welcome, health, browse jobs, list categories, public reviews |
 | USER | Post jobs, view own quotes, hire, bookings, review, chat with tradesman |
-| TRADESMAN | Quote, my quotes, my jobs, dashboard, earnings, reply to reviews, chat with customer |
-| ADMIN | Dashboard, categories CRUD, customers/tradesmen lists, suspend, grant tokens, view chats |
+| TRADESMAN | Quote, my quotes, my jobs, dashboard, earnings, buy token packages, reply to reviews, chat with customer |
+| ADMIN | Dashboard, categories CRUD, customers/tradesmen lists, suspend, grant tokens, token packages, view chats |
 
 ---
 

@@ -26,22 +26,25 @@ const TOKEN_PACKAGES = [
     name: "Starter",
     price: 30,
     tokenQuantity: 100,
-    description: "Perfect for tradesmen getting started",
+    description: "Perfect for tradesmen getting started.",
     badge: null,
+    stripePriceId: "price_1UBSnvPc4Do23EYoZc37LZnO",
   },
   {
     name: "Professional",
     price: 120,
     tokenQuantity: 500,
-    description: "Best value for active tradesmen",
+    description: "Best choice for growing businesses purchasing leads regularly.",
     badge: "Most Popular",
+    stripePriceId: "price_1UBTDPPc4Do23EYoz3MQESKN",
   },
   {
     name: "Business",
     price: 200,
     tokenQuantity: 1000,
-    description: "For established teams and high volume",
+    description: "Maximum value for active tradesmen purchasing multiple leads every week.",
     badge: null,
+    stripePriceId: "price_1UBTEVPc4Do23EYo0Cilg2hW",
   },
 ];
 
@@ -82,7 +85,19 @@ async function main() {
     const existing = await prisma.tokenPackage.findFirst({
       where: { name: pkg.name },
     });
-    if (!existing) {
+    if (existing) {
+      await prisma.tokenPackage.update({
+        where: { id: existing.id },
+        data: {
+          price: pkg.price,
+          tokenQuantity: pkg.tokenQuantity,
+          description: pkg.description,
+          badge: pkg.badge,
+          stripePriceId: pkg.stripePriceId,
+          isActive: true,
+        },
+      });
+    } else {
       await prisma.tokenPackage.create({ data: pkg });
     }
   }

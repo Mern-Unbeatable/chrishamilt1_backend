@@ -320,6 +320,7 @@ model TokenPackage {
   description   String
   badge         String?
   isActive      Boolean  @default(true)
+  stripePriceId String?  @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -342,16 +343,17 @@ model TokenRule {
 }
 
 model TokenPurchase {
-  id          String         @id @default(uuid())
-  tradesmanId String
-  tradesman   User           @relation(fields: [tradesmanId], references: [id])
-  packageId   String
-  package     TokenPackage   @relation(fields: [packageId], references: [id])
-  tokens      Int
-  amount      Decimal        @db.Decimal(10, 2)
-  status      PurchaseStatus @default(PENDING)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id              String         @id @default(uuid())
+  tradesmanId     String
+  tradesman       User           @relation(fields: [tradesmanId], references: [id])
+  packageId       String
+  package         TokenPackage   @relation(fields: [packageId], references: [id])
+  tokens          Int
+  amount          Decimal        @db.Decimal(10, 2)
+  status          PurchaseStatus @default(PENDING)
+  stripeSessionId String?        @unique
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@index([tradesmanId])
   @@index([status])

@@ -2,9 +2,15 @@ const express = require("express");
 const { body, param } = require("express-validator");
 const userController = require("../controllers/user.controller");
 const adminController = require("../controllers/admin.controller");
+const packageController = require("../controllers/package.controller");
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
 const { validate } = require("../middlewares/validate.middleware");
+const {
+  createPackageValidator,
+  updatePackageValidator,
+  packageIdValidator,
+} = require("../middlewares/validators/package.validator");
 
 const router = express.Router();
 
@@ -29,6 +35,26 @@ router.patch(
   body("amount").isFloat({ min: 1 }).withMessage("amount must be a positive number"),
   validate,
   userController.grantTokens
+);
+
+router.get("/packages", packageController.listAdminPackages);
+router.post(
+  "/packages",
+  createPackageValidator,
+  validate,
+  packageController.createPackage
+);
+router.put(
+  "/packages/:id",
+  updatePackageValidator,
+  validate,
+  packageController.updatePackage
+);
+router.delete(
+  "/packages/:id",
+  packageIdValidator,
+  validate,
+  packageController.deletePackage
 );
 
 module.exports = router;

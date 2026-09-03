@@ -1,5 +1,6 @@
 const express = require("express");
 const tradesmanController = require("../controllers/tradesman.controller");
+const packageController = require("../controllers/package.controller");
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
 const { validate } = require("../middlewares/validate.middleware");
@@ -20,6 +21,7 @@ router.get(
   tradesmanController.getEarnings
 );
 router.get("/jobs", tradesmanController.getMyAssignedJobs);
+router.get("/purchases", packageController.listMyPurchases);
 router.patch(
   "/jobs/:id/status",
   updateJobStatusValidator,
