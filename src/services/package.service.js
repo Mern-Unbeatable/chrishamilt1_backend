@@ -23,15 +23,37 @@ const serializePackage = (pkg, { includeStripe = false } = {}) => {
   };
 };
 
+const statusLabel = (status) => {
+  if (status === "COMPLETED") return "Paid";
+  if (status === "FAILED") return "Failed";
+  return "Pending";
+};
+
 const serializePurchase = (purchase) => ({
   id: purchase.id,
   packageId: purchase.packageId,
   tokens: purchase.tokens,
   amount: toNumber(purchase.amount),
   status: purchase.status,
+  statusLabel: statusLabel(purchase.status),
   stripeSessionId: purchase.stripeSessionId,
   createdAt: purchase.createdAt,
+  date: purchase.createdAt,
   package: purchase.package ? serializePackage(purchase.package) : undefined,
+  packageName: purchase.package?.name || null,
+  tradesman: purchase.tradesman
+    ? {
+        id: purchase.tradesman.id,
+        fullName: purchase.tradesman.fullName,
+        businessName: purchase.tradesman.tradesmanProfile?.businessName || null,
+        email: purchase.tradesman.email,
+      }
+    : undefined,
+  tradesmanName: purchase.tradesman
+    ? purchase.tradesman.tradesmanProfile?.businessName
+      ? `${purchase.tradesman.fullName} (${purchase.tradesman.tradesmanProfile.businessName})`
+      : purchase.tradesman.fullName
+    : null,
   tokenBalance: purchase.tokenBalance,
 });
 
@@ -288,6 +310,51 @@ const listMyPurchases = async (tradesmanId, query = {}) => {
   };
 };
 
+const listAdminPurchases = async (query = {}) => {
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 10;
+  const skip = (page - 1) * limit;
+  const search = String(query.search || "").trim();
+
+  const where = {
+    ...(query.status ? { status: query.status } : {}),
+    ...(search
+      ? {
+          OR: [
+            { tradesman: { fullName: { contains: search, mode: "insensitive" } } },
+            {
+              tradesman: {
+                tradesmanProfile: { businessName: { contains: search, mode: "insensitive" } },
+              },
+            },
+            { package: { name: { contains: search, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [purchases, total] = await Promise.all([
+    prisma.tokenPurchase.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: {
+        package: true,
+        tradesman: { include: { tradesmanProfile: true } },
+      },
+    }),
+    prisma.tokenPurchase.count({ where }),
+  ]);
+
+  return {
+    purchases: purchases.map((item) => serializePurchase(item)),
+    total,
+    page,
+    limit,
+  };
+};
+
 module.exports = {
   listPublicPackages,
   listAdminPackages,
@@ -297,4 +364,5 @@ module.exports = {
   startCheckout,
   confirmCheckout,
   listMyPurchases,
+  listAdminPurchases,
 };

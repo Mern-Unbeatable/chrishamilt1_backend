@@ -11,6 +11,7 @@ const {
   createPackageValidator,
   updatePackageValidator,
   packageIdValidator,
+  listPurchasesValidator,
 } = require("../middlewares/validators/package.validator");
 const {
   createRuleValidator,
@@ -61,6 +62,13 @@ router.delete(
   packageIdValidator,
   validate,
   packageController.deletePackage
+);
+
+router.get(
+  "/purchases",
+  listPurchasesValidator,
+  validate,
+  packageController.listAdminPurchases
 );
 
 router.get("/token-rules", tokenRuleController.listRules);

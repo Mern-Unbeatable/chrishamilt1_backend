@@ -79,6 +79,21 @@ const listMyPurchases = asyncHandler(async (req, res) => {
   });
 });
 
+const listAdminPurchases = asyncHandler(async (req, res) => {
+  const result = await packageService.listAdminPurchases(req.query);
+  return res.status(200).json({
+    success: true,
+    message: "Purchase history fetched",
+    total: result.total,
+    data: result.purchases,
+    pagination: {
+      page: result.page,
+      limit: result.limit,
+      totalPages: Math.ceil(result.total / result.limit) || 0,
+    },
+  });
+});
+
 module.exports = {
   listPublicPackages,
   listAdminPackages,
@@ -89,4 +104,5 @@ module.exports = {
   confirmCheckout,
   stripeSuccess,
   listMyPurchases,
+  listAdminPurchases,
 };

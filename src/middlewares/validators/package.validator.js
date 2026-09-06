@@ -41,9 +41,17 @@ const confirmCheckoutValidator = [
   query("session_id").optional().trim().notEmpty(),
 ];
 
+const listPurchasesValidator = [
+  query("page").optional().isInt({ min: 1 }),
+  query("limit").optional().isInt({ min: 1, max: 50 }),
+  query("status").optional().isIn(["PENDING", "COMPLETED", "FAILED"]),
+  query("search").optional().trim(),
+];
+
 module.exports = {
   createPackageValidator,
   updatePackageValidator,
   packageIdValidator,
   confirmCheckoutValidator,
+  listPurchasesValidator,
 };

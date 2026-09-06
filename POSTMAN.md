@@ -964,6 +964,28 @@ DELETE {{baseUrl}}/api/admin/packages/{{packageId}}
 
 Hard-deletes if unused. If the package already has purchases, it is only deactivated.
 
+### GET `/api/admin/purchases` — Purchase history
+
+Bearer: `{{adminToken}}`
+
+```
+GET {{baseUrl}}/api/admin/purchases?page=1&limit=10
+GET {{baseUrl}}/api/admin/purchases?status=COMPLETED&search=Connor
+```
+
+All tradesman token buys. Use this for the **Purchase History** table.
+
+| UI column | Field |
+|---|---|
+| Tradesman | `tradesmanName` (or `tradesman.fullName` / `tradesman.businessName`) |
+| Package | `packageName` |
+| Tokens | `tokens` |
+| Amount | `amount` |
+| Status | `statusLabel` (`Paid` / `Pending` / `Failed`) — raw `status` is `COMPLETED` / `PENDING` / `FAILED` |
+| Date | `date` / `createdAt` |
+
+`total` is at the top.
+
 ### GET `/api/admin/token-rules` — Token deduction rules
 
 Bearer: `{{adminToken}}`
