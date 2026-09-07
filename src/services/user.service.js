@@ -1,7 +1,8 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/apiError");
 const { hashPassword, comparePassword } = require("../utils/password");
-const { splitFullName, sanitizeUser } = require("../utils/user");
+const { splitFullName, sanitizeUser, toNumber } = require("../utils/user");
+const { serializeProfile } = require("../utils/serialize");
 
 const updateProfile = async (userId, payload) => {
   const data = { ...payload };
@@ -88,6 +89,113 @@ const listUsers = async ({ role, status, page = 1, limit = 10, search }) => {
   };
 };
 
+const getCustomerById = async (id) => {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: { warehouses: true },
+  });
+
+  if (!user || user.role !== "USER") {
+    throw new ApiError(404, "Customer not found");
+  }
+
+  const [openJobs, acceptedJobs, inProgressJobs, completedJobs, cancelledJobs, activeBookings, completedBookings, reviewsWritten] =
+    await Promise.all([
+      prisma.job.count({ where: { customerId: id, status: "OPEN" } }),
+      prisma.job.count({ where: { customerId: id, status: "ACCEPTED" } }),
+      prisma.job.count({ where: { customerId: id, status: "IN_PROGRESS" } }),
+      prisma.job.count({ where: { customerId: id, status: "COMPLETED" } }),
+      prisma.job.count({ where: { customerId: id, status: "CANCELLED" } }),
+      prisma.booking.count({
+        where: { customerId: id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
+      }),
+      prisma.booking.count({ where: { customerId: id, status: "COMPLETED" } }),
+      prisma.review.count({ where: { reviewerId: id } }),
+    ]);
+
+  const postedJobs = openJobs + acceptedJobs + inProgressJobs + completedJobs + cancelledJobs;
+
+  return {
+    ...sanitizeUser(user),
+    stats: {
+      postedJobs,
+      openJobs,
+      acceptedJobs,
+      inProgressJobs,
+      completedJobs,
+      cancelledJobs,
+      activeBookings,
+      completedBookings,
+      reviewsWritten,
+    },
+  };
+};
+
+const getTradesmanById = async (id) => {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: { tradesmanProfile: true, warehouses: true },
+  });
+
+  if (!user || user.role !== "TRADESMAN") {
+    throw new ApiError(404, "Tradesman not found");
+  }
+
+  const [
+    pendingQuotes,
+    acceptedQuotes,
+    activeJobs,
+    completedJobs,
+    tokensUsed,
+    tokensPurchased,
+    totalEarnings,
+    completedPurchases,
+  ] = await Promise.all([
+    prisma.quote.count({ where: { tradesmanId: id, status: "SUBMITTED" } }),
+    prisma.quote.count({ where: { tradesmanId: id, status: "ACCEPTED" } }),
+    prisma.booking.count({
+      where: { tradesmanId: id, status: { in: ["ACCEPTED", "IN_PROGRESS"] } },
+    }),
+    prisma.booking.count({ where: { tradesmanId: id, status: "COMPLETED" } }),
+    prisma.tokenUsage.aggregate({
+      where: { tradesmanId: id },
+      _sum: { tokens: true },
+    }),
+    prisma.tokenPurchase.aggregate({
+      where: { tradesmanId: id, status: "COMPLETED" },
+      _sum: { tokens: true, amount: true },
+    }),
+    prisma.earning.aggregate({
+      where: { tradesmanId: id },
+      _sum: { amount: true },
+    }),
+    prisma.tokenPurchase.count({
+      where: { tradesmanId: id, status: "COMPLETED" },
+    }),
+  ]);
+
+  const safe = sanitizeUser(user);
+
+  return {
+    ...safe,
+    tradesmanProfile: serializeProfile(safe.tradesmanProfile),
+    stats: {
+      tokenBalance: safe.tokenBalance || 0,
+      tokensUsed: tokensUsed._sum.tokens || 0,
+      tokensPurchased: tokensPurchased._sum.tokens || 0,
+      amountSpent: toNumber(tokensPurchased._sum.amount) || 0,
+      paidPurchases: completedPurchases,
+      pendingQuotes,
+      acceptedQuotes,
+      activeJobs,
+      completedJobs,
+      totalEarnings: toNumber(totalEarnings._sum.amount) || 0,
+      averageRating: toNumber(user.tradesmanProfile?.averageRating) || 0,
+      totalReviews: user.tradesmanProfile?.totalReviews || 0,
+    },
+  };
+};
+
 const setAccountStatus = async (userId, status) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
@@ -128,6 +236,8 @@ module.exports = {
   updateProfile,
   changePassword,
   listUsers,
+  getCustomerById,
+  getTradesmanById,
   setAccountStatus,
   grantTokens,
 };

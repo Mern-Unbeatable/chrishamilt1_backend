@@ -874,11 +874,27 @@ GET {{baseUrl}}/api/admin/customers?page=1&limit=10&search=Sarah&status=ACTIVE
 
 `status`: `ACTIVE` | `SUSPENDED`
 
+### GET `/api/admin/customers/:id` — One customer
+
+```
+GET {{baseUrl}}/api/admin/customers/{{userId}}
+```
+
+Admin only. Profile, contact, and stats (posted jobs by status, bookings, reviews written).
+
 ### GET `/api/admin/tradesmen`
 
 ```
 GET {{baseUrl}}/api/admin/tradesmen?page=1&limit=10
 ```
+
+### GET `/api/admin/tradesmen/:id` — One tradesman
+
+```
+GET {{baseUrl}}/api/admin/tradesmen/{{tradesmanId}}
+```
+
+Admin only. Profile, contact, wallet, and stats (`tokenBalance`, quotes, jobs, earnings, rating, tokens used / purchased).
 
 ### PATCH `/api/admin/users/:id/status`
 

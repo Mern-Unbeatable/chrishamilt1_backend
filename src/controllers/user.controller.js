@@ -38,6 +38,11 @@ const listCustomers = asyncHandler(async (req, res) => {
   });
 });
 
+const getCustomer = asyncHandler(async (req, res) => {
+  const customer = await userService.getCustomerById(req.params.id);
+  return success(res, { message: "Customer details", data: customer });
+});
+
 const listTradesmen = asyncHandler(async (req, res) => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
@@ -58,6 +63,11 @@ const listTradesmen = asyncHandler(async (req, res) => {
   });
 });
 
+const getTradesman = asyncHandler(async (req, res) => {
+  const tradesman = await userService.getTradesmanById(req.params.id);
+  return success(res, { message: "Tradesman details", data: tradesman });
+});
+
 const setAccountStatus = asyncHandler(async (req, res) => {
   const user = await userService.setAccountStatus(req.params.id, req.body.status);
   return success(res, { message: `Account ${req.body.status.toLowerCase()}`, data: user });
@@ -73,7 +83,9 @@ module.exports = {
   updateProfile,
   changePassword,
   listCustomers,
+  getCustomer,
   listTradesmen,
+  getTradesman,
   setAccountStatus,
   grantTokens,
 };

@@ -25,7 +25,19 @@ router.use(authenticate, authorize("ADMIN"));
 
 router.get("/dashboard", adminController.getDashboard);
 router.get("/customers", userController.listCustomers);
+router.get(
+  "/customers/:id",
+  param("id").isUUID().withMessage("Invalid user id"),
+  validate,
+  userController.getCustomer
+);
 router.get("/tradesmen", userController.listTradesmen);
+router.get(
+  "/tradesmen/:id",
+  param("id").isUUID().withMessage("Invalid user id"),
+  validate,
+  userController.getTradesman
+);
 router.patch(
   "/users/:id/status",
   param("id").isUUID().withMessage("Invalid user id"),
