@@ -13,6 +13,11 @@ const getEarnings = asyncHandler(async (req, res) => {
   return success(res, { message: "Earnings fetched", data: earnings });
 });
 
+const getWallet = asyncHandler(async (req, res) => {
+  const wallet = await tradesmanService.getWallet(req.user.id);
+  return success(res, { message: "Wallet fetched", data: wallet });
+});
+
 const getMyAssignedJobs = asyncHandler(async (req, res) => {
   const result = await bookingService.getTradesmanJobs(req.user.id, req.query);
   return paginated(res, {
@@ -36,6 +41,7 @@ const updateAssignedJobStatus = asyncHandler(async (req, res) => {
 module.exports = {
   getDashboard,
   getEarnings,
+  getWallet,
   getMyAssignedJobs,
   updateAssignedJobStatus,
 };

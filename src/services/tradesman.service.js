@@ -286,4 +286,39 @@ const getEarnings = async (tradesmanId, query = {}) => {
   };
 };
 
-module.exports = { getDashboard, getEarnings };
+const getWallet = async (tradesmanId) => {
+  const [user, used, purchased, cheapestRule] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: tradesmanId },
+      select: { tokenBalance: true },
+    }),
+    prisma.tokenUsage.aggregate({
+      where: { tradesmanId },
+      _sum: { tokens: true },
+    }),
+    prisma.tokenPurchase.aggregate({
+      where: { tradesmanId, status: "COMPLETED" },
+      _sum: { tokens: true },
+    }),
+    prisma.tokenRule.findFirst({
+      where: { isActive: true },
+      orderBy: { tokenCost: "asc" },
+      select: { tokenCost: true },
+    }),
+  ]);
+
+  const availableTokens = user?.tokenBalance || 0;
+  const tokensUsed = used._sum.tokens || 0;
+  const tokensPurchased = purchased._sum.tokens || 0;
+  const quoteTokenCost = cheapestRule?.tokenCost || 14;
+
+  return {
+    availableTokens,
+    tokensUsed,
+    tokensPurchased,
+    quotesRemaining: quoteTokenCost > 0 ? Math.floor(availableTokens / quoteTokenCost) : 0,
+    quoteTokenCost,
+  };
+};
+
+module.exports = { getDashboard, getEarnings, getWallet };

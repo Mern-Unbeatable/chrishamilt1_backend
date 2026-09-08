@@ -674,6 +674,23 @@ Bearer: `{{tradesmanToken}}`
 GET {{baseUrl}}/api/tradesman/dashboard
 ```
 
+### GET `/api/tradesman/wallet`
+
+Bearer: `{{tradesmanToken}}`
+
+```
+GET {{baseUrl}}/api/tradesman/wallet
+```
+
+Lifetime totals for the Wallet page (not by month):
+
+| UI | Field |
+|---|---|
+| Available tokens | `availableTokens` |
+| = X quotes | `quotesRemaining` (uses cheapest active token rule) |
+| Tokens used | `tokensUsed` |
+| Tokens purchased | `tokensPurchased` |
+
 ### GET `/api/tradesman/earnings`
 
 Bearer: `{{tradesmanToken}}`

@@ -14,6 +14,7 @@ const router = express.Router();
 router.use(authenticate, authorize("TRADESMAN"));
 
 router.get("/dashboard", tradesmanController.getDashboard);
+router.get("/wallet", tradesmanController.getWallet);
 router.get(
   "/earnings",
   listBookingsValidator,
