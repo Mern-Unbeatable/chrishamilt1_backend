@@ -23,7 +23,7 @@ const register = async ({ fullName, email, phoneNumber, address, password, role 
       address,
       password: hashed,
       role,
-      tokenBalance: role === "TRADESMAN" ? 100 : 0,
+      tokenBalance: 0,
       ...(role === "TRADESMAN"
         ? {
             tradesmanProfile: {

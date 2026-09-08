@@ -133,7 +133,7 @@ Save `data.user.id` → `userId`
 }
 ```
 
-New tradesmen get **100 tokens**.  
+New tradesmen start with **0 tokens**.  
 Save `data.token` → `tradesmanToken`  
 Save `data.user.id` → `tradesmanId`
 
