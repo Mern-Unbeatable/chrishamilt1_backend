@@ -42,6 +42,7 @@ const register = async ({ fullName, email, phoneNumber, address, password, role 
   return { user: sanitizeUser(user), token };
 };
 
+// login user
 const login = async ({ email, password, rememberMe = false }) => {
   const user = await prisma.user.findUnique({
     where: { email },
