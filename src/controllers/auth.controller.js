@@ -19,6 +19,21 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
+const forgotPassword = asyncHandler(async (req, res) => {
+  const result = await authService.forgotPassword(req.body);
+  return success(res, { message: result.message });
+});
+
+const verifyOtp = asyncHandler(async (req, res) => {
+  const result = await authService.verifyOtp(req.body);
+  return success(res, { message: result.message, data: { email: result.email } });
+});
+
+const resetPassword = asyncHandler(async (req, res) => {
+  const result = await authService.resetPassword(req.body);
+  return success(res, { message: result.message });
+});
+
 const me = asyncHandler(async (req, res) => {
   const user = await authService.getMe(req.user.id);
   return success(res, {
@@ -27,4 +42,4 @@ const me = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { register, login, me };
+module.exports = { register, login, forgotPassword, verifyOtp, resetPassword, me };

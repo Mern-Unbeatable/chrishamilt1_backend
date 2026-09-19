@@ -10,7 +10,7 @@ const splitFullName = (fullName) => {
 
 const sanitizeUser = (user) => {
   if (!user) return null;
-  const { password, ...safe } = user;
+  const { password, passwordResetToken, passwordResetExpires, ...safe } = user;
   return safe;
 };
 

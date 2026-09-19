@@ -20,6 +20,30 @@ const loginValidator = [
   body("rememberMe").optional().isBoolean().withMessage("rememberMe must be a boolean"),
 ];
 
+const forgotPasswordValidator = [
+  body("email").trim().isEmail().withMessage("A valid email is required").normalizeEmail(),
+];
+
+const verifyOtpValidator = [
+  body("email").trim().isEmail().withMessage("A valid email is required").normalizeEmail(),
+  body("otp")
+    .trim()
+    .matches(/^\d{5}$/)
+    .withMessage("OTP must be a 5-digit code"),
+];
+
+const resetPasswordValidator = [
+  body("email").trim().isEmail().withMessage("A valid email is required").normalizeEmail(),
+  body("newPassword")
+    .isLength({ min: 8 })
+    .withMessage("Password must be at least 8 characters"),
+  body("confirmPassword")
+    .notEmpty()
+    .withMessage("Confirm password is required")
+    .custom((value, { req }) => value === req.body.newPassword)
+    .withMessage("Passwords do not match"),
+];
+
 const changePasswordValidator = [
   body("currentPassword").notEmpty().withMessage("Current password is required"),
   body("newPassword")
@@ -48,6 +72,9 @@ const updateProfileValidator = [
 module.exports = {
   registerValidator,
   loginValidator,
+  forgotPasswordValidator,
+  verifyOtpValidator,
+  resetPasswordValidator,
   changePasswordValidator,
   updateProfileValidator,
 };

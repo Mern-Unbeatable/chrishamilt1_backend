@@ -1,6 +1,8 @@
 # Chrishamilt1 Backend — Postman Test Guide
 
-Base URL: `http://localhost:3000`
+Local: `http://localhost:3000`  
+Live API: `https://api.tradersinloop.co.uk`  
+Live frontend: `https://tradersinloop.co.uk`
 
 Start the server first:
 
@@ -170,6 +172,55 @@ POST {{baseUrl}}/api/auth/login
 
 Repeat for `daniel@test.com` and `admin@test.com`.
 
+### POST `/api/auth/forgot-password`
+
+No auth. Emails a **5-digit OTP** (valid 10 minutes). No reset link.
+
+```
+POST {{baseUrl}}/api/auth/forgot-password
+```
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+Always returns the same success message, even if the email is not registered.
+
+### POST `/api/auth/verify-otp`
+
+No auth. Check the 5-digit OTP before resetting.
+
+```
+POST {{baseUrl}}/api/auth/verify-otp
+```
+
+```json
+{
+  "email": "user@example.com",
+  "otp": "12345"
+}
+```
+
+### POST `/api/auth/reset-password`
+
+No auth. Call this only after OTP verify succeeds. Keep the same email from the previous steps.
+
+```
+POST {{baseUrl}}/api/auth/reset-password
+```
+
+```json
+{
+  "email": "user@example.com",
+  "newPassword": "password12345",
+  "confirmPassword": "password12345"
+}
+```
+
+Then log in with the new password.
+
 ### GET `/api/auth/me`
 
 Bearer: `{{userToken}}`
@@ -326,7 +377,7 @@ You can also send `requirements` as one JSON string:
 Uploaded files are stored on the server and returned as:
 
 ```
-https://tradesinloop-backend.maktechgroup.tech/uploads/<filename>
+https://api.tradersinloop.co.uk/uploads/<filename>
 ```
 
 Allowed images: `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`, `.svg`. Max 10 files, 5MB each.
@@ -557,7 +608,7 @@ Use **form-data** in Postman (Body → form-data). Do not set Content-Type manua
 Uploaded files are stored on the server and returned as:
 
 ```
-https://tradesinloop-backend.maktechgroup.tech/uploads/<filename>
+https://api.tradersinloop.co.uk/uploads/<filename>
 ```
 
 Allowed images: `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`, `.svg`. Max 10 files, 5MB each.
@@ -1119,11 +1170,11 @@ Open `data.checkoutUrl` in the browser and pay with a Stripe test card: `4242 42
 
 You only need this one API. After pay, Stripe hits:
 
-`https://tradesinloop-backend.maktechgroup.tech/api/packages/stripe/success?session_id={CHECKOUT_SESSION_ID}`
+`https://api.tradersinloop.co.uk/api/packages/stripe/success?session_id={CHECKOUT_SESSION_ID}`
 
 That adds tokens, then redirects to:
 
-`https://tradesinloop.maktechgroup.tech/wallet?status=success`
+`https://tradersinloop.co.uk/wallet?status=success`
 
 `POST /api/packages/confirm` is optional (safe to call twice).
 
