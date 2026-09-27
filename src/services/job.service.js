@@ -330,6 +330,7 @@ const cancelJob = async (id, actor) => {
   return serializeJob(updated, { includeContact: true });
 };
 
+// Delete a job post
 const deleteJob = async (id, actor) => {
   const job = await prisma.job.findUnique({ where: { id } });
   if (!job) {
