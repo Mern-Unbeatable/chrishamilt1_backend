@@ -14,6 +14,7 @@ const listCategories = async () => {
   });
 };
 
+// Create a new category
 const createCategory = async ({ name, icon }) => {
   const slug = toSlug(name);
   const iconKey = normalizeIcon(icon);
@@ -31,6 +32,7 @@ const createCategory = async ({ name, icon }) => {
   });
 };
 
+// Update a category
 const updateCategory = async (id, { name, icon }) => {
   const category = await prisma.category.findUnique({ where: { id } });
   if (!category) {
