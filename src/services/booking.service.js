@@ -143,6 +143,7 @@ const hireQuote = async (customerId, quoteId) => {
   return serializeBooking(booking, { includeCustomerContact: true });
 };
 
+// Get all bookings for a customer
 const getMyBookings = async (customerId, query = {}) => {
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 10;
