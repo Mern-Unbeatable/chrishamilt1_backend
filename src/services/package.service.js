@@ -332,7 +332,7 @@ const listAdminPurchases = async (query = {}) => {
         }
       : {}),
   };
-
+ // admin purchases list
   const [purchases, total] = await Promise.all([
     prisma.tokenPurchase.findMany({
       where,

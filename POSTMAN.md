@@ -515,11 +515,13 @@ GET {{baseUrl}}/api/jobs/mine?status=OPEN
 
 ### GET `/api/jobs/:id`
 
+Bearer required (`{{userToken}}`, `{{tradesmanToken}}`, or `{{adminToken}}`). Guests cannot view job details.
+
 ```
 GET {{baseUrl}}/api/jobs/{{jobId}}
 ```
 
-Auth optional. Customer contact is shown to the owner, tradesman, or admin.
+Customer contact is shown to the owner, tradesman, or admin.
 
 ### PUT `/api/jobs/:id` — Owner / Admin
 
@@ -582,7 +584,7 @@ Then `GET /api/jobs/mine` no longer includes that job. `GET /api/jobs/{{jobId}}`
 
 ## 6. Quotes
 
-Sending a quote deducts tokens (usually **14**). If the tradesman has 0 tokens, grant some first (section 11).
+Sending a quote opens **Stripe Checkout**. The card charge is the admin `price` for that quotation range. `tokensCharged` is the range `tokenCost` (recorded after pay, not taken from the wallet). Example: quote £2100 → £1,000–£4,000 → pay `price` (default £40) for 40 tokens.
 
 ### POST `/api/jobs/:id/quotes` — Tradesman only
 
@@ -613,7 +615,8 @@ https://api.tradersinloop.co.uk/uploads/<filename>
 
 Allowed images: `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`, `.svg`. Max 10 files, 5MB each.
 
-Save `data.id` → `quoteId`
+Save `data.quoteId` → `quoteId`  
+Open `data.checkoutUrl` and pay. Then the quote status becomes `SUBMITTED`.
 
 JSON raw body still works if you send image URLs instead of files.
 
@@ -1070,6 +1073,14 @@ All tradesman token buys. Use this for the **Purchase History** table.
 
 `total` is at the top.
 
+### GET `/api/token-rules` — Active ranges (logged in)
+
+Bearer: any logged-in user. Use this on the quote form to show token cost for the quotation amount.
+
+```
+GET {{baseUrl}}/api/token-rules
+```
+
 ### GET `/api/admin/token-rules` — Token deduction rules
 
 Bearer: `{{adminToken}}`
@@ -1078,17 +1089,18 @@ Bearer: `{{adminToken}}`
 GET {{baseUrl}}/api/admin/token-rules
 ```
 
-Seeded defaults (5 ranges):
+Seeded defaults (6 ranges). Charge is based on **quotation amount**, not job budget. Admin can change `tokenCost` on any row.
 
-| Label | Min | Max | Tokens |
-|---|---|---|---|
-| Under £1,000 | 0 | 999 | 10 |
-| £1,000 – £2,000 | 1000 | 2000 | 20 |
-| £2,000 – £3,000 | 2001 | 3000 | 30 |
-| £3,000 – £5,000 | 3001 | 5000 | 40 |
-| Above £5,000 | 5001 | unlimited | 50 |
+| Label | Min | Max | Tokens | Stripe price |
+|---|---|---|---|---|
+| £0 – £100 | 0 | 100 | 10 | £10 |
+| £100 – £250 | 100 | 250 | 15 | £15 |
+| £250 – £500 | 250 | 500 | 20 | £20 |
+| £500 – £1,000 | 500 | 1000 | 30 | £30 |
+| £1,000 – £4,000 | 1000 | 4000 | 40 | £40 |
+| £4,000+ | 4000 | unlimited | 50 | £50 |
 
-Use this for the **Token Rules** table. Each row has `name` (label), `budgetRange`, `minBudget`, `maxBudget` (`null` = unlimited / `∞`), `tokenCost`, `status` (`Active` / `Inactive`).
+Exact boundary values (e.g. £100) use the **higher** range. Use this for the **Token Rules** table. Each row has `name` (label), `budgetRange`, `minBudget`, `maxBudget` (`null` = unlimited / `∞`), `tokenCost`, `status` (`Active` / `Inactive`).
 
 ### POST `/api/admin/token-rules` — Add Rule
 
@@ -1098,10 +1110,11 @@ POST {{baseUrl}}/api/admin/token-rules
 
 ```json
 {
-  "name": "Under £1,000",
+  "name": "£0 – £100",
   "minBudget": 0,
-  "maxBudget": 999,
+  "maxBudget": 100,
   "tokenCost": 10,
+  "price": 10,
   "isActive": true
 }
 ```
@@ -1114,6 +1127,7 @@ Unlimited max (leave blank in the UI):
   "minBudget": 10000,
   "maxBudget": null,
   "tokenCost": 40,
+  "price": 40,
   "isActive": true
 }
 ```
@@ -1128,10 +1142,11 @@ PUT {{baseUrl}}/api/admin/token-rules/{{tokenRuleId}}
 
 ```json
 {
-  "name": "Under £1,000",
+  "name": "£0 – £100",
   "minBudget": 0,
-  "maxBudget": 999,
+  "maxBudget": 100,
   "tokenCost": 10,
+  "price": 10,
   "isActive": true
 }
 ```
@@ -1142,7 +1157,7 @@ PUT {{baseUrl}}/api/admin/token-rules/{{tokenRuleId}}
 DELETE {{baseUrl}}/api/admin/token-rules/{{tokenRuleId}}
 ```
 
-New jobs use these rules for quote token cost. Old jobs keep their existing `leadPrice`.
+Token cost is calculated when the tradesman **sends a quote**, from `amount`. Adjacent ranges may share a boundary (e.g. 100 and 250). Changing `tokenCost` does not re-charge old quotes.
 
 ---
 

@@ -10,6 +10,7 @@ const createRuleValidator = [
     .custom((value) => value === null || value === "" || Number(value) >= 0)
     .withMessage("maxBudget must be 0 or more, or blank for unlimited"),
   body("tokenCost").isInt({ min: 1 }).withMessage("tokenCost must be at least 1"),
+  body("price").isFloat({ min: 0.5 }).withMessage("price must be at least 0.50"),
   body("description").optional({ nullable: true }).isString(),
   body("isActive").optional().isBoolean(),
 ];
@@ -23,6 +24,7 @@ const updateRuleValidator = [
     .custom((value) => value === null || value === "" || Number(value) >= 0)
     .withMessage("maxBudget must be 0 or more, or blank for unlimited"),
   body("tokenCost").optional().isInt({ min: 1 }),
+  body("price").optional().isFloat({ min: 0.5 }).withMessage("price must be at least 0.50"),
   body("description").optional({ nullable: true }).isString(),
   body("isActive").optional().isBoolean(),
 ];

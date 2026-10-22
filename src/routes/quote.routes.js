@@ -7,11 +7,22 @@ const {
   updateQuoteValidator,
   quoteIdValidator,
   listQuotesValidator,
+  confirmQuoteCheckoutValidator,
 } = require("../middlewares/validators/quote.validator");
 const { uploadJobImages } = require("../middlewares/upload.middleware");
 const { parseQuoteForm } = require("../middlewares/parseJobForm.middleware");
 
 const router = express.Router();
+
+router.get("/stripe/success", quoteController.stripeSuccess);
+router.post(
+  "/confirm",
+  authenticate,
+  authorize("TRADESMAN"),
+  confirmQuoteCheckoutValidator,
+  validate,
+  quoteController.confirmQuoteCheckout
+);
 
 router.get(
   "/mine",

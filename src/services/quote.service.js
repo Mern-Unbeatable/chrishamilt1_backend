@@ -1,8 +1,11 @@
 const prisma = require("../config/prisma");
+const env = require("../config/env");
 const ApiError = require("../utils/apiError");
 const { toNumber } = require("../utils/user");
 const { serializeTradesman, serializeCustomer } = require("../utils/serialize");
 const { ensureConversation } = require("./conversation.service");
+const { resolveQuoteCharge } = require("./tokenRule.service");
+const { getStripe } = require("../config/stripe");
 
 const quoteInclude = {
   images: true,
@@ -32,6 +35,8 @@ const serializeQuote = (quote, { preview = false, includeCustomerContact = false
     proposal: preview ? undefined : quote.proposal,
     proposalPreview: quote.proposal ? quote.proposal.slice(0, 180) : "",
     status: quote.status,
+    tokensCharged: quote.tokensCharged || null,
+    amountPaid: toNumber(quote.amountPaid),
     createdAt: quote.createdAt,
     updatedAt: quote.updatedAt,
     images: quote.images || [],
@@ -67,11 +72,6 @@ const assertCanViewQuote = (quote, viewer) => {
   throw new ApiError(403, "You cannot view this quote");
 };
 
-const resolveTokenCost = (job) => {
-  const cost = Number(job.leadPrice);
-  return Number.isFinite(cost) && cost > 0 ? Math.round(cost) : 14;
-};
-
 const createQuote = async (tradesmanId, jobId, payload) => {
   const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) {
@@ -87,70 +87,179 @@ const createQuote = async (tradesmanId, jobId, payload) => {
   const existing = await prisma.quote.findUnique({
     where: { jobId_tradesmanId: { jobId, tradesmanId } },
   });
-  if (existing) {
+  if (existing && existing.status !== "PENDING_PAYMENT") {
     throw new ApiError(409, "You have already sent a quote for this job");
   }
 
-  const tokenCost = resolveTokenCost(job);
+  const charge = await resolveQuoteCharge(payload.amount);
   const images = payload.images || [];
+  const quoteData = {
+    amount: payload.amount,
+    estimatedDuration: payload.estimatedDuration,
+    startDate: new Date(payload.startDate),
+    materialsIncluded:
+      payload.materialsIncluded === undefined ? false : Boolean(payload.materialsIncluded),
+    warranty: payload.warranty || null,
+    proposal: payload.proposal || "",
+    status: "PENDING_PAYMENT",
+    tokensCharged: charge.tokenCost,
+    amountPaid: charge.price,
+  };
 
-  const created = await prisma.$transaction(async (tx) => {
-    const tradesman = await tx.user.findUnique({
-      where: { id: tradesmanId },
-      select: { tokenBalance: true },
-    });
-    if (tradesman.tokenBalance < tokenCost) {
-      throw new ApiError(
-        400,
-        `Not enough tokens. This lead costs ${tokenCost} tokens`
-      );
+  const saved = await prisma.$transaction(async (tx) => {
+    let quote;
+    if (existing) {
+      await tx.quoteImage.deleteMany({ where: { quoteId: existing.id } });
+      quote = await tx.quote.update({
+        where: { id: existing.id },
+        data: {
+          ...quoteData,
+          images: images.length ? { create: images.map((url) => ({ url })) } : undefined,
+        },
+      });
+    } else {
+      quote = await tx.quote.create({
+        data: {
+          jobId,
+          tradesmanId,
+          ...quoteData,
+          images: images.length ? { create: images.map((url) => ({ url })) } : undefined,
+        },
+      });
     }
-
-    await tx.user.update({
-      where: { id: tradesmanId },
-      data: { tokenBalance: { decrement: tokenCost } },
-    });
-
-    await tx.tokenUsage.create({
-      data: {
-        tradesmanId,
-        jobId,
-        tokens: tokenCost,
-        reason: "QUOTE",
-      },
-    });
-
-    return tx.quote.create({
-      data: {
-        jobId,
-        tradesmanId,
-        amount: payload.amount,
-        estimatedDuration: payload.estimatedDuration,
-        startDate: new Date(payload.startDate),
-        materialsIncluded:
-          payload.materialsIncluded === undefined
-            ? false
-            : Boolean(payload.materialsIncluded),
-        warranty: payload.warranty || null,
-        proposal: payload.proposal || "",
-        images: images.length ? { create: images.map((url) => ({ url })) } : undefined,
-      },
-      select: { id: true },
-    });
+    return quote;
   });
 
-  const quote = await prisma.quote.findUnique({
-    where: { id: created.id },
-    include: quoteInclude,
+  const tradesman = await prisma.user.findUnique({
+    where: { id: tradesmanId },
+    select: { email: true },
+  });
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    payment_method_types: ["card"],
+    customer_email: tradesman?.email,
+    line_items: [
+      {
+        price_data: {
+          currency: "gbp",
+          unit_amount: Math.round(Number(charge.price) * 100),
+          product_data: {
+            name: `Quote lead — ${charge.tokenCost} tokens`,
+            description: `${charge.rule.name} for job ${job.jobCode || job.title}`,
+          },
+        },
+        quantity: 1,
+      },
+    ],
+    client_reference_id: saved.id,
+    metadata: {
+      type: "QUOTE",
+      quoteId: saved.id,
+      jobId,
+      tradesmanId,
+      tokenCost: String(charge.tokenCost),
+    },
+    success_url: `${env.publicBaseUrl.replace(/\/$/, "")}/api/quotes/stripe/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:
+      process.env.STRIPE_QUOTE_CANCEL_URL ||
+      `${env.frontendUrl.replace(/\/$/, "")}/jobs/${jobId}?status=cancelled`,
+  });
+
+  await prisma.quote.update({
+    where: { id: saved.id },
+    data: { stripeSessionId: session.id },
+  });
+
+  return {
+    quoteId: saved.id,
+    checkoutUrl: session.url,
+    sessionId: session.id,
+    tokensCharged: charge.tokenCost,
+    amountPaid: charge.price,
+    tokenRule: charge.rule.name,
+    publishableKey: env.stripePublishableKey,
+  };
+};
+
+const fulfillPaidQuote = async (session) => {
+  if (!session || session.payment_status !== "paid") {
+    throw new ApiError(400, "Payment is not completed yet");
+  }
+
+  const quoteId = session.metadata?.quoteId || session.client_reference_id;
+  const quote = quoteId
+    ? await prisma.quote.findUnique({ where: { id: quoteId }, include: { job: true } })
+    : await prisma.quote.findUnique({
+        where: { stripeSessionId: session.id },
+        include: { job: true },
+      });
+
+  if (!quote) {
+    throw new ApiError(404, "Quote not found");
+  }
+
+  if (quote.status !== "PENDING_PAYMENT") {
+    return {
+      alreadyCompleted: true,
+      quote: await prisma.quote.findUnique({
+        where: { id: quote.id },
+        include: quoteInclude,
+      }),
+    };
+  }
+
+  const tokensCharged = quote.tokensCharged || Number(session.metadata?.tokenCost) || 0;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.quote.update({
+      where: { id: quote.id },
+      data: {
+        status: "SUBMITTED",
+        stripeSessionId: session.id,
+      },
+    });
+
+    if (tokensCharged > 0) {
+      await tx.tokenUsage.create({
+        data: {
+          tradesmanId: quote.tradesmanId,
+          jobId: quote.jobId,
+          tokens: tokensCharged,
+          reason: "QUOTE",
+        },
+      });
+    }
   });
 
   await ensureConversation({
-    customerId: job.customerId,
-    tradesmanId,
-    jobId,
+    customerId: quote.job.customerId,
+    tradesmanId: quote.tradesmanId,
+    jobId: quote.jobId,
   });
 
-  return serializeQuote(quote, { includeCustomerContact: true });
+  const submitted = await prisma.quote.findUnique({
+    where: { id: quote.id },
+    include: quoteInclude,
+  });
+
+  return { alreadyCompleted: false, quote: submitted };
+};
+
+const confirmQuoteCheckout = async (sessionId, viewer = null) => {
+  if (!sessionId) {
+    throw new ApiError(400, "sessionId is required");
+  }
+
+  const stripe = getStripe();
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+  if (viewer && session.metadata?.tradesmanId && session.metadata.tradesmanId !== viewer.id) {
+    throw new ApiError(403, "This payment does not belong to you");
+  }
+
+  return fulfillPaidQuote(session);
 };
 
 const updateQuote = async (quoteId, tradesmanId, payload) => {
@@ -161,8 +270,8 @@ const updateQuote = async (quoteId, tradesmanId, payload) => {
   if (quote.tradesmanId !== tradesmanId) {
     throw new ApiError(403, "You can only update your own quotes");
   }
-  if (quote.status !== "SUBMITTED") {
-    throw new ApiError(400, "Only submitted quotes can be updated");
+  if (!["SUBMITTED", "PENDING_PAYMENT"].includes(quote.status)) {
+    throw new ApiError(400, "Only submitted or unpaid quotes can be updated");
   }
 
   const data = {
@@ -205,8 +314,8 @@ const withdrawQuote = async (quoteId, tradesmanId) => {
   if (quote.tradesmanId !== tradesmanId) {
     throw new ApiError(403, "You can only withdraw your own quotes");
   }
-  if (quote.status !== "SUBMITTED") {
-    throw new ApiError(400, "Only submitted quotes can be withdrawn");
+  if (!["SUBMITTED", "PENDING_PAYMENT"].includes(quote.status)) {
+    throw new ApiError(400, "Only submitted or unpaid quotes can be withdrawn");
   }
 
   const updated = await prisma.quote.update({
@@ -265,7 +374,7 @@ const listJobQuotes = async (jobId, viewer) => {
   const quotes = await prisma.quote.findMany({
     where: {
       jobId,
-      status: { not: "WITHDRAWN" },
+      status: { notIn: ["WITHDRAWN", ...(isTradesman && !isOwner && !isAdmin ? [] : ["PENDING_PAYMENT"])] },
       ...(isTradesman && !isAdmin && !isOwner ? { tradesmanId: viewer.id } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -323,6 +432,7 @@ const getQuoteById = async (quoteId, viewer) => {
 
 module.exports = {
   createQuote,
+  confirmQuoteCheckout,
   updateQuote,
   withdrawQuote,
   getMyQuotes,

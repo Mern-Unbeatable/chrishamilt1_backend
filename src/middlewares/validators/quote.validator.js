@@ -30,7 +30,11 @@ const quoteIdValidator = [param("id").isUUID().withMessage("Invalid quote id")];
 const listQuotesValidator = [
   query("page").optional().isInt({ min: 1 }),
   query("limit").optional().isInt({ min: 1, max: 50 }),
-  query("status").optional().isIn(["SUBMITTED", "ACCEPTED", "REJECTED", "WITHDRAWN"]),
+  query("status").optional().isIn(["PENDING_PAYMENT", "SUBMITTED", "ACCEPTED", "REJECTED", "WITHDRAWN"]),
+];
+
+const confirmQuoteCheckoutValidator = [
+  body("sessionId").trim().notEmpty().withMessage("sessionId is required"),
 ];
 
 module.exports = {
@@ -38,4 +42,5 @@ module.exports = {
   updateQuoteValidator,
   quoteIdValidator,
   listQuotesValidator,
+  confirmQuoteCheckoutValidator,
 };

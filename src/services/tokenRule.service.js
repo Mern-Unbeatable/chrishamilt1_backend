@@ -31,6 +31,7 @@ const serializeRule = (rule) => {
     minBudget,
     maxBudget,
     tokenCost: rule.tokenCost,
+    price: money(rule.price) || 0,
     description: rule.description,
     isActive: rule.isActive,
     status: rule.isActive ? "Active" : "Inactive",
@@ -45,7 +46,7 @@ const rangeTop = (maxBudget) =>
     : Number(maxBudget);
 
 const rangesOverlap = (aMin, aMax, bMin, bMax) => {
-  return Number(aMin) <= rangeTop(bMax) && Number(bMin) <= rangeTop(aMax);
+  return Number(aMin) < rangeTop(bMax) && Number(bMin) < rangeTop(aMax);
 };
 
 const assertNoOverlap = async ({ minBudget, maxBudget, excludeId, isActive = true }) => {
@@ -77,6 +78,14 @@ const listRules = async () => {
   return rules.map(serializeRule);
 };
 
+const listActiveRules = async () => {
+  const rules = await prisma.tokenRule.findMany({
+    where: { isActive: true },
+    orderBy: [{ minBudget: "asc" }, { tokenCost: "asc" }],
+  });
+  return rules.map(serializeRule);
+};
+
 const createRule = async (payload) => {
   const minBudget = Number(payload.minBudget);
   const maxBudget =
@@ -97,6 +106,7 @@ const createRule = async (payload) => {
       minBudget,
       maxBudget,
       tokenCost: Number(payload.tokenCost),
+      price: Number(payload.price),
       description: payload.description || null,
       isActive,
     },
@@ -132,6 +142,7 @@ const updateRule = async (id, payload) => {
     name: payload.name !== undefined ? payload.name.trim() : undefined,
     minBudget: payload.minBudget !== undefined ? minBudget : undefined,
     tokenCost: payload.tokenCost !== undefined ? Number(payload.tokenCost) : undefined,
+    price: payload.price !== undefined ? Number(payload.price) : undefined,
     description: payload.description !== undefined ? payload.description : undefined,
     isActive: payload.isActive !== undefined ? isActive : undefined,
   };
@@ -157,29 +168,55 @@ const deleteRule = async (id) => {
   return { id };
 };
 
-const resolveLeadPrice = async (budgetMax) => {
+const findMatchingRule = async (budgetMax) => {
   const amount = Number(budgetMax);
   const rules = await prisma.tokenRule.findMany({
     where: { isActive: true },
     orderBy: { minBudget: "desc" },
   });
 
-  const match = rules.find((rule) => {
+  return rules.find((rule) => {
     const min = money(rule.minBudget) || 0;
     const max = money(rule.maxBudget);
     if (amount < min) return false;
     if (max === null || max === undefined) return true;
     return amount <= max;
   });
+};
 
-  return match ? match.tokenCost : 14;
+const resolveLeadPrice = async (budgetMax) => {
+  const match = await findMatchingRule(budgetMax);
+  if (!match) {
+    throw new ApiError(400, "No token rule matches this quotation amount");
+  }
+  return match.tokenCost;
+};
+
+const resolveQuoteCharge = async (quotationAmount) => {
+  const match = await findMatchingRule(quotationAmount);
+  if (!match) {
+    throw new ApiError(400, "No token rule matches this quotation amount");
+  }
+
+  const price = money(match.price);
+  if (!price || price <= 0) {
+    throw new ApiError(400, "Admin has not set a Stripe price for this quotation range");
+  }
+
+  return {
+    tokenCost: match.tokenCost,
+    price,
+    rule: serializeRule(match),
+  };
 };
 
 module.exports = {
   listRules,
+  listActiveRules,
   createRule,
   updateRule,
   deleteRule,
   resolveLeadPrice,
+  resolveQuoteCharge,
   serializeRule,
 };

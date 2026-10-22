@@ -2,14 +2,33 @@ const asyncHandler = require("../utils/asyncHandler");
 const { success } = require("../utils/apiResponse");
 const quoteService = require("../services/quote.service");
 const bookingService = require("../services/booking.service");
+const env = require("../config/env");
 
 const createQuote = asyncHandler(async (req, res) => {
-  const quote = await quoteService.createQuote(req.user.id, req.params.id, req.body);
+  const checkout = await quoteService.createQuote(req.user.id, req.params.id, req.body);
   return success(res, {
     statusCode: 201,
-    message: "Quote submitted successfully",
-    data: quote,
+    message: "Checkout created. Pay to submit this quote.",
+    data: checkout,
   });
+});
+
+const confirmQuoteCheckout = asyncHandler(async (req, res) => {
+  const sessionId = req.body.sessionId || req.query.session_id;
+  const result = await quoteService.confirmQuoteCheckout(sessionId, req.user);
+  return success(res, {
+    message: result.alreadyCompleted ? "Quote payment already confirmed" : "Quote submitted successfully",
+    data: result.quote,
+  });
+});
+
+const stripeSuccess = asyncHandler(async (req, res) => {
+  const sessionId = req.query.session_id;
+  await quoteService.confirmQuoteCheckout(sessionId);
+  const redirectTo =
+    process.env.STRIPE_QUOTE_SUCCESS_URL ||
+    `${env.frontendUrl.replace(/\/$/, "")}/quotes?status=success`;
+  return res.redirect(redirectTo);
 });
 
 const listJobQuotes = asyncHandler(async (req, res) => {
@@ -58,6 +77,8 @@ const hireQuote = asyncHandler(async (req, res) => {
 
 module.exports = {
   createQuote,
+  confirmQuoteCheckout,
+  stripeSuccess,
   listJobQuotes,
   getMyQuotes,
   getQuote,

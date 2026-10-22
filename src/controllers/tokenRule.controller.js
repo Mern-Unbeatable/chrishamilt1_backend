@@ -12,6 +12,16 @@ const listRules = asyncHandler(async (req, res) => {
   });
 });
 
+const listActiveRules = asyncHandler(async (req, res) => {
+  const rules = await tokenRuleService.listActiveRules();
+  return res.status(200).json({
+    success: true,
+    message: "Token rules fetched",
+    total: rules.length,
+    data: rules,
+  });
+});
+
 const createRule = asyncHandler(async (req, res) => {
   const rule = await tokenRuleService.createRule(req.body);
   return success(res, { statusCode: 201, message: "Token rule created", data: rule });
@@ -27,4 +37,4 @@ const deleteRule = asyncHandler(async (req, res) => {
   return success(res, { message: "Token rule deleted", data: result });
 });
 
-module.exports = { listRules, createRule, updateRule, deleteRule };
+module.exports = { listRules, listActiveRules, createRule, updateRule, deleteRule };

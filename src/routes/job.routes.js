@@ -37,7 +37,7 @@ router.post(
   validate,
   quoteController.createQuote
 );
-router.get("/:id", jobIdValidator, validate, optionalAuth, jobController.getJob);
+router.get("/:id", authenticate, jobIdValidator, validate, jobController.getJob);
 
 router.post(
   "/",
