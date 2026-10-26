@@ -309,7 +309,7 @@ const listMyPurchases = async (tradesmanId, query = {}) => {
     limit,
   };
 };
-
+// admin purchases list
 const listAdminPurchases = async (query = {}) => {
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 10;
