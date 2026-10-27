@@ -1019,8 +1019,7 @@ POST {{baseUrl}}/api/admin/packages
   "price": 30,
   "tokenQuantity": 100,
   "description": "Perfect for tradesmen getting started.",
-  "isPopular": false,
-  "stripePriceId": "price_1UBSnvPc4Do23EYoZc37LZnO"
+  "isPopular": false
 }
 ```
 
@@ -1036,8 +1035,7 @@ PUT {{baseUrl}}/api/admin/packages/{{packageId}}
   "price": 30,
   "tokenQuantity": 100,
   "description": "Perfect for tradesmen getting started.",
-  "isPopular": true,
-  "stripePriceId": "price_1UBSnvPc4Do23EYoZc37LZnO"
+  "isPopular": true
 }
 ```
 

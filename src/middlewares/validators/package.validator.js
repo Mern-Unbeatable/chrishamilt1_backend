@@ -7,12 +7,6 @@ const createPackageValidator = [
     .isInt({ min: 1 })
     .withMessage("Token quantity must be a positive integer"),
   body("description").trim().notEmpty().withMessage("Description is required"),
-  body("stripePriceId")
-    .trim()
-    .notEmpty()
-    .withMessage("stripePriceId is required")
-    .matches(/^price_/)
-    .withMessage("stripePriceId must be a Stripe price id"),
   body("badge").optional({ nullable: true }).isString(),
   body("isPopular").optional().isBoolean(),
   body("isActive").optional().isBoolean(),
@@ -24,11 +18,6 @@ const updatePackageValidator = [
   body("price").optional().isFloat({ min: 0 }),
   body("tokenQuantity").optional().isInt({ min: 1 }),
   body("description").optional().trim().notEmpty(),
-  body("stripePriceId")
-    .optional()
-    .trim()
-    .matches(/^price_/)
-    .withMessage("stripePriceId must be a Stripe price id"),
   body("badge").optional({ nullable: true }).isString(),
   body("isPopular").optional().isBoolean(),
   body("isActive").optional().isBoolean(),

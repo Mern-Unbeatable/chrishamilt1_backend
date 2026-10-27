@@ -174,8 +174,10 @@ const startCheckout = async (tradesman, packageId) => {
   if (!pkg || !pkg.isActive) {
     throw new ApiError(404, "Package not found");
   }
-  if (!pkg.stripePriceId) {
-    throw new ApiError(400, "This package is not linked to a Stripe price");
+
+  const price = Number(pkg.price);
+  if (!price || price <= 0) {
+    throw new ApiError(400, "Package price must be greater than 0");
   }
 
   const purchase = await prisma.tokenPurchase.create({
@@ -194,7 +196,19 @@ const startCheckout = async (tradesman, packageId) => {
     payment_method_types: ["card"],
     customer_email: tradesman.email,
     client_reference_id: purchase.id,
-    line_items: [{ price: pkg.stripePriceId, quantity: 1 }],
+    line_items: [
+      {
+        price_data: {
+          currency: "gbp",
+          unit_amount: Math.round(price * 100),
+          product_data: {
+            name: pkg.name,
+            description: `${pkg.tokenQuantity} tokens`,
+          },
+        },
+        quantity: 1,
+      },
+    ],
     metadata: {
       purchaseId: purchase.id,
       tradesmanId: tradesman.id,
