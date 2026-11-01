@@ -140,7 +140,18 @@ async function main() {
     await prisma.tokenRule.create({ data: rule });
   }
 
-  console.log("Seed complete: categories, token packages, and token rules");
+  await prisma.siteSetting.upsert({
+    where: { key: "contact" },
+    update: {},
+    create: {
+      key: "contact",
+      address: "2 enterprise house, barkering, London IG11 0JZ, United Kingdom",
+      phone: "07392255366",
+      email: "admin@tradersinloop.co.uk",
+    },
+  });
+
+  console.log("Seed complete: categories, token packages, token rules, and contact settings");
 }
 
 main()

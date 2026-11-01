@@ -11,6 +11,7 @@ const tradesmanRoutes = require("./tradesman.routes");
 const conversationRoutes = require("./conversation.routes");
 const packageRoutes = require("./package.routes");
 const tokenRuleRoutes = require("./tokenRule.routes");
+const settingsRoutes = require("./settings.routes");
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.use("/jobs", jobRoutes);
 router.use("/categories", categoryRoutes);
 router.use("/packages", packageRoutes);
 router.use("/token-rules", tokenRuleRoutes);
+router.use("/settings", settingsRoutes);
 router.use("/quotes", quoteRoutes);
 router.use("/bookings", bookingRoutes);
 router.use("/reviews", reviewRoutes);

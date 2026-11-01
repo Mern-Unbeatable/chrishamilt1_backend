@@ -4,6 +4,7 @@ const userController = require("../controllers/user.controller");
 const adminController = require("../controllers/admin.controller");
 const packageController = require("../controllers/package.controller");
 const tokenRuleController = require("../controllers/tokenRule.controller");
+const settingsController = require("../controllers/settings.controller");
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
 const { validate } = require("../middlewares/validate.middleware");
@@ -18,6 +19,7 @@ const {
   updateRuleValidator,
   ruleIdValidator,
 } = require("../middlewares/validators/tokenRule.validator");
+const { updateContactValidator } = require("../middlewares/validators/settings.validator");
 
 const router = express.Router();
 
@@ -101,6 +103,13 @@ router.delete(
   ruleIdValidator,
   validate,
   tokenRuleController.deleteRule
+);
+
+router.put(
+  "/settings/contact",
+  updateContactValidator,
+  validate,
+  settingsController.updateContact
 );
 
 module.exports = router;

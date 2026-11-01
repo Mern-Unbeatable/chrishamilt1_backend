@@ -397,3 +397,15 @@ model Earning {
   @@index([createdAt])
   @@map("earnings")
 }
+
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  address   String
+  phone     String
+  email     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("site_settings")
+}

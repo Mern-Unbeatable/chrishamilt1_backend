@@ -1317,6 +1317,34 @@ REST send also emits `message:new` so a connected client still gets live updates
 
 ---
 
+## 12. Footer contact settings
+
+### GET `/api/settings/contact`
+
+No auth. Use this on the website footer and the admin edit form.
+
+```
+GET {{baseUrl}}/api/settings/contact
+```
+
+### PUT `/api/admin/settings/contact` — Admin only
+
+Bearer: `{{adminToken}}`
+
+```
+PUT {{baseUrl}}/api/admin/settings/contact
+```
+
+```json
+{
+  "address": "2 enterprise house, barkering, London IG11 0JZ, United Kingdom",
+  "phone": "07392255366",
+  "email": "admin@tradersinloop.co.uk"
+}
+```
+
+---
+
 ## Quick role map
 
 | Who | Can do |
@@ -1324,7 +1352,7 @@ REST send also emits `message:new` so a connected client still gets live updates
 | Anyone | Welcome, health, browse jobs, list categories, public reviews |
 | USER | Post jobs, view own quotes, hire, bookings, review, chat with tradesman |
 | TRADESMAN | Quote, my quotes, my jobs, dashboard, earnings, buy token packages, reply to reviews, chat with customer |
-| ADMIN | Dashboard, categories, customers/tradesmen, token packages, token rules, suspend, grant tokens, view chats |
+| ADMIN | Dashboard, categories, customers/tradesmen, token packages, token rules, footer contact, suspend, grant tokens, view chats |
 
 ---
 
