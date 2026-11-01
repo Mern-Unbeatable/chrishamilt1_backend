@@ -80,17 +80,6 @@ const findJobUnlock = async (db, tradesmanId, jobId) => {
   });
 };
 
-const findJobBuyer = async (db, jobId) => {
-  return db.tokenUsage.findFirst({
-    where: {
-      jobId,
-      reason: { in: JOB_UNLOCK_REASONS },
-    },
-    orderBy: { createdAt: "asc" },
-    select: { tradesmanId: true, tokens: true, createdAt: true },
-  });
-};
-
 const serializePurchasedJob = (job, purchasedAt) => {
   if (!job) return null;
   return {
@@ -153,11 +142,6 @@ const openJobConversation = async (job, tradesmanId) => {
 };
 
 const unlockJobForTradesman = async (job, tradesmanId) => {
-  const buyer = await findJobBuyer(prisma, job.id);
-  if (buyer && buyer.tradesmanId !== tradesmanId) {
-    throw new ApiError(400, "This job has already been purchased");
-  }
-
   const existing = await findJobUnlock(prisma, tradesmanId, job.id);
   if (existing) {
     const [user, conversation] = await Promise.all([
@@ -180,11 +164,6 @@ const unlockJobForTradesman = async (job, tradesmanId) => {
   const cost = await jobTokenCost(job);
 
   const access = await prisma.$transaction(async (tx) => {
-    const taken = await findJobBuyer(tx, job.id);
-    if (taken && taken.tradesmanId !== tradesmanId) {
-      throw new ApiError(400, "This job has already been purchased");
-    }
-
     const again = await findJobUnlock(tx, tradesmanId, job.id);
     if (again) {
       const user = await tx.user.findUnique({
@@ -307,9 +286,6 @@ const browseJobs = async (query = {}, viewer = null) => {
 
   const where = {
     status: query.status || "OPEN",
-    tokenUsages: {
-      none: { reason: { in: JOB_UNLOCK_REASONS } },
-    },
     ...(query.urgency ? { urgency: query.urgency } : {}),
     ...(query.location
       ? { location: { contains: query.location, mode: "insensitive" } }
