@@ -1,6 +1,6 @@
 # Postman — quotation and booking
 
-Test how a customer posts a job, a tradesman pays Stripe to send a quote, and the customer books (hires) that quote.
+Test how a customer posts a job, a tradesman spends wallet tokens to open job details, sends a quote, and the customer books (hires) that quote.
 
 Local: `http://localhost:3000`  
 Live: `https://api.tradersinloop.co.uk`
@@ -10,25 +10,25 @@ Live: `https://api.tradersinloop.co.uk`
 ## What happens
 
 1. **Customer** posts a job.
-2. **Tradesman** writes a quote and clicks buy/pay.
-3. API sends them to **Stripe**. Charge = admin `price` for that quotation amount range. `tokenCost` is stored on the quote.
-4. After pay, quote status becomes `SUBMITTED`. The customer can see it.
+2. **Tradesman** buys a token package (Stripe) or gets tokens from admin.
+3. Tradesman opens **job details**. Wallet tokens are deducted once (`leadPrice` from the job budget range).
+4. Tradesman sends a quote. No extra Stripe charge. Status is `SUBMITTED`.
 5. **Customer** hires the quote → a **booking** is created.
 
-The customer does **not** pay the platform to hire. Stripe is for the tradesman’s quote lead fee only.
+The customer does **not** pay the platform to hire. Stripe is only for buying token packages.
 
-| Quote `amount` | Tokens | Stripe charge |
-|---|---|---|
-| £0 – £100 | 10 | £10 |
-| £100 – £250 | 15 | £15 |
-| £250 – £500 | 20 | £20 |
-| £500 – £1,000 | 30 | £30 |
-| £1,000 – £4,000 | 40 | £40 |
-| £4,000+ | 50 | £50 |
+| Job budget | Tokens deducted on first view |
+|---|---|
+| £0 – £100 | 10 |
+| £100 – £250 | 15 |
+| £250 – £500 | 20 |
+| £500 – £1,000 | 30 |
+| £1,000 – £4,000 | 40 |
+| £4,000+ | 50 |
 
-Exact boundary (e.g. £100) uses the higher range. Admin can change `tokenCost` and `price`.
+Exact boundary (e.g. £100) uses the higher range. Admin can change `tokenCost`.
 
-Quote status: `PENDING_PAYMENT` → `SUBMITTED` → `ACCEPTED` (after hire). Other quotes on the same job become `REJECTED`.
+Quote status: `SUBMITTED` → `ACCEPTED` (after hire). Other quotes on the same job become `REJECTED`.
 
 ---
 
@@ -41,8 +41,7 @@ Quote status: `PENDING_PAYMENT` → `SUBMITTED` → `ACCEPTED` (after hire). Oth
 | `tradesmanToken` | tradesman login |
 | `categoryId` | GET categories |
 | `jobId` | POST job |
-| `quoteId` | POST quote (`data.quoteId`) |
-| `sessionId` | POST quote (`data.sessionId`) |
+| `quoteId` | POST quote (`data.id`) |
 | `bookingId` | hire (`data.id`) |
 
 Authorization: **Bearer Token**.  
@@ -144,9 +143,13 @@ GET {{baseUrl}}/api/jobs/{{jobId}}
 
 Without a token this returns **401**.
 
+First open deducts `leadPrice` tokens (job budget £1500–£2500 → £1,000–£4,000 → 40 tokens). Check `data.tokensCharged` and `data.tokenBalance`. Open again: `tokensCharged` is `0`.
+
+Not enough tokens → 400 `Not enough tokens to view this job`.
+
 ---
 
-## 5. Tradesman creates a quote → Stripe pay
+## 5. Tradesman creates a quote
 
 Bearer: `{{tradesmanToken}}`
 
@@ -165,49 +168,13 @@ POST {{baseUrl}}/api/jobs/{{jobId}}/quotes
 }
 ```
 
-£2100 is in **£1,000 – £4,000** → default Stripe **£40**, **40 tokens**.
-
-Save:
-
-- `data.quoteId` → `quoteId`
-- `data.sessionId` → `sessionId`
-- `data.checkoutUrl` — open in the browser and pay
-
-Quote is `PENDING_PAYMENT` until Stripe is paid. The customer cannot see it yet.
+Save `data.id` → `quoteId`. Status is `SUBMITTED` immediately. No Stripe checkout.
 
 Form-data also works (same keys; images as File).
 
 ---
 
-## 6. Confirm payment
-
-After Stripe pay, success URL is:
-
-```
-GET {{baseUrl}}/api/quotes/stripe/success?session_id={{sessionId}}
-```
-
-That marks the quote `SUBMITTED` and redirects to the frontend.
-
-Optional (if you did not follow the redirect):
-
-```
-POST {{baseUrl}}/api/quotes/confirm
-```
-
-Bearer: `{{tradesmanToken}}`
-
-```json
-{
-  "sessionId": "{{sessionId}}"
-}
-```
-
-Safe to call twice.
-
----
-
-## 7. Tradesman checks the quote
+## 6. Tradesman checks the quote
 
 ```
 GET {{baseUrl}}/api/quotes/mine?page=1&limit=10
@@ -219,8 +186,7 @@ GET {{baseUrl}}/api/quotes/{{quoteId}}
 
 Bearer: `{{tradesmanToken}}`
 
-`status` should be `SUBMITTED`.  
-`tokensCharged` and `amountPaid` should match the range.
+`status` should be `SUBMITTED`.
 
 Withdraw (if you do not want hire on this quote):
 
@@ -232,7 +198,7 @@ Withdrawn quotes stay unpaid/unrefunded. Customer list hides `WITHDRAWN`.
 
 ---
 
-## 8. Customer books the quote (hire)
+## 7. Customer books the quote (hire)
 
 Bearer: `{{userToken}}`
 
@@ -261,7 +227,7 @@ Only the job owner can hire. Quote must be `SUBMITTED`.
 
 ---
 
-## 9. Confirm the booking
+## 8. Confirm the booking
 
 Customer:
 
@@ -303,9 +269,9 @@ PATCH {{baseUrl}}/api/tradesman/jobs/{{jobId}}/status
 
 1. Login customer + tradesman  
 2. GET categories → POST job  
-3. GET token-rules (see price for £2100)  
-4. POST quote → open `checkoutUrl` → pay  
-5. GET quotes/mine (`SUBMITTED`)  
+3. Tradesman GET job details (tokens deduct)  
+4. POST quote (`SUBMITTED`)  
+5. GET quotes/mine  
 6. Customer GET job quotes → POST hire  
 7. GET bookings / tradesman jobs  
 
@@ -316,8 +282,7 @@ PATCH {{baseUrl}}/api/tradesman/jobs/{{jobId}}/status
 | Result | Meaning |
 |---|---|
 | 401 on job details | Not logged in |
-| 400 `No token rule matches` | Quote amount has no active range |
-| 400 `Admin has not set a Stripe price` | Range `price` is 0 |
-| 409 already sent a quote | This tradesman already quoted this job (unless still `PENDING_PAYMENT`) |
+| 400 `Not enough tokens to view this job` | Wallet is below this job's `leadPrice` |
+| 409 already sent a quote | This tradesman already quoted this job |
 | 400 hire | Quote is not `SUBMITTED`, or job is not `OPEN` |
 | 403 hire | Not the job owner |

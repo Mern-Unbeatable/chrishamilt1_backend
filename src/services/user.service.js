@@ -4,8 +4,24 @@ const { hashPassword, comparePassword } = require("../utils/password");
 const { splitFullName, sanitizeUser, toNumber } = require("../utils/user");
 const { serializeProfile } = require("../utils/serialize");
 
+const PROFILE_FIELDS = [
+  "fullName",
+  "firstName",
+  "lastName",
+  "phoneNumber",
+  "address",
+  "region",
+  "city",
+  "zipCode",
+  "profileImage",
+  "email",
+];
+
 const updateProfile = async (userId, payload) => {
-  const data = { ...payload };
+  const data = {};
+  PROFILE_FIELDS.forEach((key) => {
+    if (payload[key] !== undefined) data[key] = payload[key];
+  });
 
   if (data.email) {
     const taken = await prisma.user.findFirst({
@@ -211,6 +227,46 @@ const setAccountStatus = async (userId, status) => {
   return sanitizeUser(updated);
 };
 
+const deleteUser = async (userId, actorId) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  if (user.role === "ADMIN") {
+    throw new ApiError(400, "Admin accounts cannot be deleted");
+  }
+  if (userId === actorId) {
+    throw new ApiError(400, "You cannot delete your own account");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.message.deleteMany({ where: { senderId: userId } });
+    await tx.conversation.deleteMany({
+      where: { OR: [{ customerId: userId }, { tradesmanId: userId }] },
+    });
+    await tx.review.deleteMany({
+      where: { OR: [{ reviewerId: userId }, { tradesmanId: userId }] },
+    });
+    await tx.booking.deleteMany({
+      where: { OR: [{ customerId: userId }, { tradesmanId: userId }] },
+    });
+    await tx.earning.deleteMany({
+      where: { OR: [{ tradesmanId: userId }, { job: { customerId: userId } }] },
+    });
+    await tx.tokenUsage.deleteMany({
+      where: { OR: [{ tradesmanId: userId }, { job: { customerId: userId } }] },
+    });
+    await tx.tokenPurchase.deleteMany({ where: { tradesmanId: userId } });
+    await tx.quote.deleteMany({ where: { tradesmanId: userId } });
+    await tx.job.updateMany({
+      where: { tradesmanId: userId },
+      data: { tradesmanId: null },
+    });
+    await tx.job.deleteMany({ where: { customerId: userId } });
+    await tx.user.delete({ where: { id: userId } });
+  });
+};
+
 const grantTokens = async (userId, amount) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
@@ -239,5 +295,6 @@ module.exports = {
   getCustomerById,
   getTradesmanById,
   setAccountStatus,
+  deleteUser,
   grantTokens,
 };

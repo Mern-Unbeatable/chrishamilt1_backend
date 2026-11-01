@@ -6,13 +6,22 @@ const {
   updateProfileValidator,
   changePasswordValidator,
 } = require("../middlewares/validators/auth.validator");
+const { uploadProfileImage } = require("../middlewares/upload.middleware");
+const { parseProfileForm } = require("../middlewares/parseJobForm.middleware");
 
 const router = express.Router();
 
 router.use(authenticate);
 
 router.get("/profile", userController.getProfile);
-router.put("/profile", updateProfileValidator, validate, userController.updateProfile);
+router.put(
+  "/profile",
+  uploadProfileImage,
+  parseProfileForm,
+  updateProfileValidator,
+  validate,
+  userController.updateProfile
+);
 router.put(
   "/change-password",
   changePasswordValidator,

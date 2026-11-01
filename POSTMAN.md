@@ -51,8 +51,8 @@ Authorization: Bearer {{userToken}}
 2. Register **USER**, **TRADESMAN**, **ADMIN** → login each → save tokens
 3. Get categories → save `categoryId`
 4. User posts a job → save `jobId`
-5. Admin grants tokens to the tradesman
-6. Tradesman sends a quote → save `quoteId`
+5. Admin grants tokens to the tradesman (or tradesman buys a package)
+6. Tradesman opens job details (tokens deduct once) → sends a quote → save `quoteId`
 7. User views quotes → hires → save `bookingId`
 8. Tradesman updates job: `IN_PROGRESS` then `COMPLETED`
 9. User leaves a review → tradesman replies
@@ -243,9 +243,24 @@ GET {{baseUrl}}/api/users/profile
 
 ### PUT `/api/users/profile`
 
+Customer, tradesman, or admin. Register + login er por ei API te photo upload kora jay.
+
 ```
 PUT {{baseUrl}}/api/users/profile
 ```
+
+**Photo upload (form-data):** Body → form-data. Do not set Content-Type manually.
+
+| Key | Type | Value |
+|---|---|---|
+| profileImage | File | *(choose a photo)* |
+| firstName | Text | Sarah |
+| lastName | Text | Morrison |
+
+Saved as `https://api.tradersinloop.co.uk/uploads/<filename>`.  
+Allowed: `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`, `.svg`. Max 5MB. One file.
+
+JSON still works if you only update text, or send a photo URL:
 
 ```json
 {
@@ -521,7 +536,24 @@ Bearer required (`{{userToken}}`, `{{tradesmanToken}}`, or `{{adminToken}}`). Gu
 GET {{baseUrl}}/api/jobs/{{jobId}}
 ```
 
-Customer contact is shown to the owner, tradesman, or admin.
+A tradesman opening this page spends the job's `leadPrice` tokens **once**. Repeat views are free. Owner and admin are not charged.
+
+Response extras for a tradesman: `unlocked`, `tokensCharged` (this request), `tokensRequired`, `tokenBalance`.
+
+Customer contact is shown only to the owner, admin, assigned tradesman, or a tradesman who already unlocked the job.
+
+Not enough tokens:
+
+```json
+{
+  "success": false,
+  "message": "Not enough tokens to view this job",
+  "errors": {
+    "tokensRequired": 40,
+    "tokenBalance": 0
+  }
+}
+```
 
 ### PUT `/api/jobs/:id` — Owner / Admin
 
@@ -584,7 +616,7 @@ Then `GET /api/jobs/mine` no longer includes that job. `GET /api/jobs/{{jobId}}`
 
 ## 6. Quotes
 
-Sending a quote opens **Stripe Checkout**. The card charge is the admin `price` for that quotation range. `tokensCharged` is the range `tokenCost` (recorded after pay, not taken from the wallet). Example: quote £2100 → £1,000–£4,000 → pay `price` (default £40) for 40 tokens.
+Sending a quote does **not** open Stripe. Tokens are taken from the wallet when the tradesman first opens job details (`GET /api/jobs/:id`). If they quote without opening the job first, that same unlock runs here once.
 
 ### POST `/api/jobs/:id/quotes` — Tradesman only
 
@@ -615,8 +647,7 @@ https://api.tradersinloop.co.uk/uploads/<filename>
 
 Allowed images: `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`, `.svg`. Max 10 files, 5MB each.
 
-Save `data.quoteId` → `quoteId`  
-Open `data.checkoutUrl` and pay. Then the quote status becomes `SUBMITTED`.
+Save `data.id` → `quoteId`. Status is `SUBMITTED` immediately.
 
 JSON raw body still works if you send image URLs instead of files.
 
@@ -736,7 +767,7 @@ Bearer: `{{tradesmanToken}}`
 GET {{baseUrl}}/api/tradesman/wallet
 ```
 
-Lifetime totals for the Wallet page (not by month):
+Lifetime totals for the Wallet page (not by month). Viewing a job details page deducts tokens from `availableTokens` and adds them to `tokensUsed`.
 
 | UI | Field |
 |---|---|
@@ -987,6 +1018,16 @@ Set back to `ACTIVE` before more user tests.
 }
 ```
 
+### DELETE `/api/admin/users/:id` — Remove customer or tradesman
+
+Admin dashboard delete/remove button. Same endpoint for both pages.
+
+```
+DELETE {{baseUrl}}/api/admin/users/{{userId}}
+```
+
+Removes the user and related jobs, quotes, bookings, chats, reviews, and token rows. Admin accounts cannot be deleted.
+
 ### PATCH `/api/admin/tradesmen/:id/tokens`
 
 ```
@@ -1073,7 +1114,7 @@ All tradesman token buys. Use this for the **Purchase History** table.
 
 ### GET `/api/token-rules` — Active ranges (logged in)
 
-Bearer: any logged-in user. Use this on the quote form to show token cost for the quotation amount.
+Bearer: any logged-in user. Use this to show how many tokens a job unlock costs from the job budget.
 
 ```
 GET {{baseUrl}}/api/token-rules
@@ -1087,7 +1128,7 @@ Bearer: `{{adminToken}}`
 GET {{baseUrl}}/api/admin/token-rules
 ```
 
-Seeded defaults (6 ranges). Charge is based on **quotation amount**, not job budget. Admin can change `tokenCost` on any row.
+Seeded defaults (6 ranges). Unlock cost is based on the **job budget** (`budgetMax` → `leadPrice`). Admin can change `tokenCost` on any row.
 
 | Label | Min | Max | Tokens | Stripe price |
 |---|---|---|---|---|
@@ -1155,7 +1196,7 @@ PUT {{baseUrl}}/api/admin/token-rules/{{tokenRuleId}}
 DELETE {{baseUrl}}/api/admin/token-rules/{{tokenRuleId}}
 ```
 
-Token cost is calculated when the tradesman **sends a quote**, from `amount`. Adjacent ranges may share a boundary (e.g. 100 and 250). Changing `tokenCost` does not re-charge old quotes.
+Token cost is calculated when the job is posted, from `budgetMax`, and stored as `leadPrice`. Adjacent ranges may share a boundary (e.g. 100 and 250). Changing `tokenCost` does not re-charge jobs already unlocked.
 
 ---
 
@@ -1351,8 +1392,8 @@ PUT {{baseUrl}}/api/admin/settings/contact
 |---|---|
 | Anyone | Welcome, health, browse jobs, list categories, public reviews |
 | USER | Post jobs, view own quotes, hire, bookings, review, chat with tradesman |
-| TRADESMAN | Quote, my quotes, my jobs, dashboard, earnings, buy token packages, reply to reviews, chat with customer |
-| ADMIN | Dashboard, categories, customers/tradesmen, token packages, token rules, footer contact, suspend, grant tokens, view chats |
+| TRADESMAN | Buy tokens, view job details (deducts tokens once), quote, my quotes, my jobs, dashboard, earnings, reply to reviews, chat with customer |
+| ADMIN | Dashboard, categories, customers/tradesmen, token packages, token rules, footer contact, suspend, delete user, grant tokens, view chats |
 
 ---
 

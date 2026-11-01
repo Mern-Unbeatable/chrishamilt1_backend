@@ -56,4 +56,11 @@ const uploadJobImages = (req, res, next) => {
   });
 };
 
-module.exports = { uploadJobImages, uploadDir };
+const uploadProfileImage = (req, res, next) => {
+  upload.single("profileImage")(req, res, (err) => {
+    if (err) return next(err);
+    next();
+  });
+};
+
+module.exports = { uploadJobImages, uploadProfileImage, uploadDir };

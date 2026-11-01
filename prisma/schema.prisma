@@ -249,11 +249,11 @@ model Booking {
   jobId       String        @unique
   job         Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
   quoteId     String        @unique
-  quote       Quote         @relation(fields: [quoteId], references: [id])
+  quote       Quote         @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   customerId  String
-  customer    User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  customer    User          @relation("CustomerBookings", fields: [customerId], references: [id], onDelete: Cascade)
   tradesmanId String
-  tradesman   User          @relation("TradesmanBookings", fields: [tradesmanId], references: [id])
+  tradesman   User          @relation("TradesmanBookings", fields: [tradesmanId], references: [id], onDelete: Cascade)
   price       Decimal       @db.Decimal(12, 2)
   scheduledAt DateTime?
   status      BookingStatus @default(ACCEPTED)
@@ -271,9 +271,9 @@ model Review {
   jobId       String
   job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   reviewerId  String
-  reviewer    User      @relation("ReviewAuthor", fields: [reviewerId], references: [id])
+  reviewer    User      @relation("ReviewAuthor", fields: [reviewerId], references: [id], onDelete: Cascade)
   tradesmanId String
-  tradesman   User      @relation("ReviewTarget", fields: [tradesmanId], references: [id])
+  tradesman   User      @relation("ReviewTarget", fields: [tradesmanId], references: [id], onDelete: Cascade)
   rating      Int
   comment     String
   reply       String?
@@ -289,9 +289,9 @@ model Review {
 model Conversation {
   id            String   @id @default(uuid())
   customerId    String
-  customer      User     @relation("ConversationCustomer", fields: [customerId], references: [id])
+  customer      User     @relation("ConversationCustomer", fields: [customerId], references: [id], onDelete: Cascade)
   tradesmanId   String
-  tradesman     User     @relation("ConversationTradesman", fields: [tradesmanId], references: [id])
+  tradesman     User     @relation("ConversationTradesman", fields: [tradesmanId], references: [id], onDelete: Cascade)
   jobId         String?
   job           Job?     @relation(fields: [jobId], references: [id])
   lastMessageAt DateTime @default(now())
@@ -310,7 +310,7 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderId       String
-  sender         User         @relation(fields: [senderId], references: [id])
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
   content        String
   isRead         Boolean      @default(false)
   createdAt      DateTime     @default(now())
@@ -355,7 +355,7 @@ model TokenRule {
 model TokenPurchase {
   id              String         @id @default(uuid())
   tradesmanId     String
-  tradesman       User           @relation(fields: [tradesmanId], references: [id])
+  tradesman       User           @relation(fields: [tradesmanId], references: [id], onDelete: Cascade)
   packageId       String
   package         TokenPackage   @relation(fields: [packageId], references: [id])
   tokens          Int
@@ -373,7 +373,7 @@ model TokenPurchase {
 model TokenUsage {
   id          String   @id @default(uuid())
   tradesmanId String
-  tradesman   User     @relation(fields: [tradesmanId], references: [id])
+  tradesman   User     @relation(fields: [tradesmanId], references: [id], onDelete: Cascade)
   jobId       String?
   job         Job?     @relation(fields: [jobId], references: [id])
   tokens      Int
@@ -387,9 +387,9 @@ model TokenUsage {
 model Earning {
   id          String   @id @default(uuid())
   tradesmanId String
-  tradesman   User     @relation(fields: [tradesmanId], references: [id])
+  tradesman   User     @relation(fields: [tradesmanId], references: [id], onDelete: Cascade)
   jobId       String
-  job         Job      @relation(fields: [jobId], references: [id])
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
   amount      Decimal  @db.Decimal(12, 2)
   createdAt   DateTime @default(now())
 

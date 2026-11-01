@@ -3,8 +3,11 @@ const ApiError = require("../utils/apiError");
 const { nextJobCode } = require("../utils/jobCode");
 const { toNumber } = require("../utils/user");
 const tokenRuleService = require("./tokenRule.service");
+const { ensureConversation } = require("./conversation.service");
 
-const serializeJob = (job, { includeContact = false } = {}) => {
+const JOB_UNLOCK_REASONS = ["JOB_VIEW", "QUOTE"];
+
+const serializeJob = (job, { includeContact = false, unlocked = false } = {}) => {
   if (!job) return null;
 
   const customer = job.customer
@@ -27,6 +30,7 @@ const serializeJob = (job, { includeContact = false } = {}) => {
     budgetMin: toNumber(job.budgetMin),
     budgetMax: toNumber(job.budgetMax),
     leadPrice: toNumber(job.leadPrice),
+    unlocked,
     customer,
     tradesman: job.tradesman
       ? {
@@ -49,12 +53,130 @@ const generateJobCode = async () => {
 
 const resolveLeadPrice = (budgetMax) => tokenRuleService.resolveLeadPrice(budgetMax);
 
-const canViewContact = (viewer, job) => {
+const canViewContact = (viewer, job, unlocked = false) => {
   if (!viewer) return false;
   if (viewer.role === "ADMIN") return true;
   if (viewer.id === job.customerId) return true;
-  if (viewer.role === "TRADESMAN") return true;
+  if (viewer.role === "TRADESMAN" && (unlocked || viewer.id === job.tradesmanId)) return true;
   return false;
+};
+
+const jobTokenCost = async (job) => {
+  const stored = Number(job.leadPrice);
+  if (Number.isFinite(stored) && stored > 0) {
+    return Math.round(stored);
+  }
+  return tokenRuleService.resolveLeadPrice(job.budgetMax);
+};
+
+const findJobUnlock = async (db, tradesmanId, jobId) => {
+  return db.tokenUsage.findFirst({
+    where: {
+      tradesmanId,
+      jobId,
+      reason: { in: JOB_UNLOCK_REASONS },
+    },
+    select: { id: true, tokens: true },
+  });
+};
+
+const openJobConversation = async (job, tradesmanId) => {
+  if (!job?.customerId || !tradesmanId || job.customerId === tradesmanId) {
+    return null;
+  }
+
+  return ensureConversation({
+    customerId: job.customerId,
+    tradesmanId,
+    jobId: job.id,
+  });
+};
+
+const unlockJobForTradesman = async (job, tradesmanId) => {
+  const existing = await findJobUnlock(prisma, tradesmanId, job.id);
+  if (existing) {
+    const [user, conversation] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: tradesmanId },
+        select: { tokenBalance: true },
+      }),
+      openJobConversation(job, tradesmanId),
+    ]);
+    return {
+      unlocked: true,
+      charged: false,
+      tokensCharged: 0,
+      tokensRequired: existing.tokens,
+      tokenBalance: user?.tokenBalance || 0,
+      conversationId: conversation?.id || null,
+    };
+  }
+
+  const cost = await jobTokenCost(job);
+
+  const access = await prisma.$transaction(async (tx) => {
+    const again = await findJobUnlock(tx, tradesmanId, job.id);
+    if (again) {
+      const user = await tx.user.findUnique({
+        where: { id: tradesmanId },
+        select: { tokenBalance: true },
+      });
+      return {
+        unlocked: true,
+        charged: false,
+        tokensCharged: 0,
+        tokensRequired: again.tokens,
+        tokenBalance: user?.tokenBalance || 0,
+      };
+    }
+
+    const deducted = await tx.user.updateMany({
+      where: { id: tradesmanId, tokenBalance: { gte: cost } },
+      data: { tokenBalance: { decrement: cost } },
+    });
+
+    if (deducted.count === 0) {
+      const user = await tx.user.findUnique({
+        where: { id: tradesmanId },
+        select: { tokenBalance: true },
+      });
+      if (!user) {
+        throw new ApiError(404, "User not found");
+      }
+      throw new ApiError(400, "Not enough tokens to view this job", {
+        tokensRequired: cost,
+        tokenBalance: user.tokenBalance || 0,
+      });
+    }
+
+    const updated = await tx.user.findUnique({
+      where: { id: tradesmanId },
+      select: { tokenBalance: true },
+    });
+
+    await tx.tokenUsage.create({
+      data: {
+        tradesmanId,
+        jobId: job.id,
+        tokens: cost,
+        reason: "JOB_VIEW",
+      },
+    });
+
+    return {
+      unlocked: true,
+      charged: true,
+      tokensCharged: cost,
+      tokensRequired: cost,
+      tokenBalance: updated?.tokenBalance || 0,
+    };
+  });
+
+  const conversation = await openJobConversation(job, tradesmanId);
+  return {
+    ...access,
+    conversationId: conversation?.id || null,
+  };
 };
 
 const createJob = async (customerId, payload) => {
@@ -105,7 +227,7 @@ const createJob = async (customerId, payload) => {
     },
   });
 
-  return serializeJob(job, { includeContact: true });
+  return serializeJob(job, { includeContact: true, unlocked: true });
 };
 
 const browseJobs = async (query = {}, viewer = null) => {
@@ -159,10 +281,31 @@ const browseJobs = async (query = {}, viewer = null) => {
     prisma.job.count({ where }),
   ]);
 
+  let unlockedIds = new Set();
+  if (viewer?.role === "TRADESMAN" && jobs.length) {
+    const unlocks = await prisma.tokenUsage.findMany({
+      where: {
+        tradesmanId: viewer.id,
+        jobId: { in: jobs.map((job) => job.id) },
+        reason: { in: JOB_UNLOCK_REASONS },
+      },
+      select: { jobId: true },
+    });
+    unlockedIds = new Set(unlocks.map((row) => row.jobId));
+  }
+
   return {
-    jobs: jobs.map((job) =>
-      serializeJob(job, { includeContact: canViewContact(viewer, job) })
-    ),
+    jobs: jobs.map((job) => {
+      const unlocked =
+        viewer?.role === "ADMIN" ||
+        viewer?.id === job.customerId ||
+        unlockedIds.has(job.id) ||
+        viewer?.id === job.tradesmanId;
+      return serializeJob(job, {
+        includeContact: canViewContact(viewer, job, unlocked),
+        unlocked,
+      });
+    }),
     total,
     page,
     limit,
@@ -186,7 +329,38 @@ const getJobById = async (id, viewer = null) => {
     throw new ApiError(404, "Job not found");
   }
 
-  return serializeJob(job, { includeContact: canViewContact(viewer, job) });
+  const isOwner = viewer?.id === job.customerId;
+  const isAdmin = viewer?.role === "ADMIN";
+  const isAssigned = viewer?.role === "TRADESMAN" && viewer.id === job.tradesmanId;
+  const shouldUnlock =
+    viewer?.role === "TRADESMAN" && !isOwner && !isAdmin && !isAssigned;
+
+  let access = {
+    unlocked: isOwner || isAdmin || isAssigned,
+    charged: false,
+    tokensCharged: 0,
+    tokensRequired: Number(job.leadPrice) || 0,
+    tokenBalance: null,
+    conversationId: null,
+  };
+
+  if (shouldUnlock) {
+    access = await unlockJobForTradesman(job, viewer.id);
+  } else if (isAssigned) {
+    const conversation = await openJobConversation(job, viewer.id);
+    access.conversationId = conversation?.id || null;
+  }
+
+  return {
+    ...serializeJob(job, {
+      includeContact: canViewContact(viewer, job, access.unlocked),
+      unlocked: access.unlocked,
+    }),
+    tokensCharged: access.tokensCharged,
+    tokensRequired: access.tokensRequired,
+    tokenBalance: access.tokenBalance,
+    conversationId: access.conversationId || null,
+  };
 };
 
 const getMyJobs = async (customerId, query = {}) => {
@@ -216,7 +390,7 @@ const getMyJobs = async (customerId, query = {}) => {
   ]);
 
   return {
-    jobs: jobs.map((job) => serializeJob(job, { includeContact: true })),
+    jobs: jobs.map((job) => serializeJob(job, { includeContact: true, unlocked: true })),
     total,
     page,
     limit,
@@ -254,6 +428,10 @@ const updateJob = async (id, actor, payload) => {
   Object.keys(data).forEach((key) => {
     if (data[key] === undefined) delete data[key];
   });
+
+  if (payload.budgetMax !== undefined) {
+    data.leadPrice = await resolveLeadPrice(payload.budgetMax);
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     if (requirements) {
@@ -367,4 +545,5 @@ module.exports = {
   updateJob,
   cancelJob,
   deleteJob,
+  unlockJobForTradesman,
 };

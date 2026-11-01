@@ -73,6 +73,11 @@ const setAccountStatus = asyncHandler(async (req, res) => {
   return success(res, { message: `Account ${req.body.status.toLowerCase()}`, data: user });
 });
 
+const deleteUser = asyncHandler(async (req, res) => {
+  await userService.deleteUser(req.params.id, req.user.id);
+  return success(res, { message: "User removed" });
+});
+
 const grantTokens = asyncHandler(async (req, res) => {
   const user = await userService.grantTokens(req.params.id, Number(req.body.amount));
   return success(res, { message: "Tokens granted", data: user });
@@ -87,5 +92,6 @@ module.exports = {
   listTradesmen,
   getTradesman,
   setAccountStatus,
+  deleteUser,
   grantTokens,
 };

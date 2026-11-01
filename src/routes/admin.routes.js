@@ -49,6 +49,12 @@ router.patch(
   validate,
   userController.setAccountStatus
 );
+router.delete(
+  "/users/:id",
+  param("id").isUUID().withMessage("Invalid user id"),
+  validate,
+  userController.deleteUser
+);
 
 router.patch(
   "/tradesmen/:id/tokens",

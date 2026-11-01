@@ -29,6 +29,13 @@ const parseJobForm = (req, res, next) => {
   next();
 };
 
+const parseProfileForm = (req, res, next) => {
+  if (req.file) {
+    req.body.profileImage = publicFileUrl(req.file.filename, req);
+  }
+  next();
+};
+
 const parseQuoteForm = (req, res, next) => {
   if (req.body.materialsIncluded !== undefined) {
     req.body.materialsIncluded = parseBoolean(req.body.materialsIncluded);
@@ -37,4 +44,4 @@ const parseQuoteForm = (req, res, next) => {
   next();
 };
 
-module.exports = { parseJobForm, parseQuoteForm };
+module.exports = { parseJobForm, parseQuoteForm, parseProfileForm };

@@ -334,10 +334,17 @@ GET {{baseUrl}}/api/jobs/{{jobId}}
 
 Bearer: `{{tradesmanToken}}` (401 without a token)
 
-### 15. Tradesman pays on Stripe to submit a quote
+### 15. Tradesman opens job details (tokens deduct) then quotes
 
-Bearer: `{{tradesmanToken}}`  
-Body → **form-data** or JSON
+Bearer: `{{tradesmanToken}}`
+
+Opening job details deducts wallet tokens once:
+
+```
+GET {{baseUrl}}/api/jobs/{{jobId}}
+```
+
+Then send the quote (no Stripe):
 
 ```
 POST {{baseUrl}}/api/jobs/{{jobId}}/quotes
@@ -354,30 +361,7 @@ POST {{baseUrl}}/api/jobs/{{jobId}}/quotes
 }
 ```
 
-£2100 matches **£1,000 – £4,000**. Stripe charge is that range’s `price` (e.g. £45). `tokensCharged` is the range’s `tokenCost`.
-
-Response:
-
-- `data.checkoutUrl` — open this in the browser and pay
-- `data.sessionId`
-- `data.quoteId` → save as `quoteId`
-- `data.amountPaid` / `data.tokensCharged`
-
-After pay, Stripe hits `GET /api/quotes/stripe/success?session_id=...` and the quote becomes `SUBMITTED`.
-
-Optional confirm:
-
-```
-POST {{baseUrl}}/api/quotes/confirm
-```
-
-```json
-{
-  "sessionId": "cs_test_..."
-}
-```
-
-Until payment succeeds, the customer does **not** see the quote.
+Save `data.id` → `quoteId`. Status is `SUBMITTED`.
 
 ### 16. Customer sees quotes and hires (books the service)
 

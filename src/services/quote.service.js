@@ -1,11 +1,10 @@
 const prisma = require("../config/prisma");
-const env = require("../config/env");
 const ApiError = require("../utils/apiError");
 const { toNumber } = require("../utils/user");
 const { serializeTradesman, serializeCustomer } = require("../utils/serialize");
 const { ensureConversation } = require("./conversation.service");
-const { resolveQuoteCharge } = require("./tokenRule.service");
 const { getStripe } = require("../config/stripe");
+const { unlockJobForTradesman } = require("./job.service");
 
 const quoteInclude = {
   images: true,
@@ -91,7 +90,7 @@ const createQuote = async (tradesmanId, jobId, payload) => {
     throw new ApiError(409, "You have already sent a quote for this job");
   }
 
-  const charge = await resolveQuoteCharge(payload.amount);
+  const access = await unlockJobForTradesman(job, tradesmanId);
   const images = payload.images || [];
   const quoteData = {
     amount: payload.amount,
@@ -101,9 +100,10 @@ const createQuote = async (tradesmanId, jobId, payload) => {
       payload.materialsIncluded === undefined ? false : Boolean(payload.materialsIncluded),
     warranty: payload.warranty || null,
     proposal: payload.proposal || "",
-    status: "PENDING_PAYMENT",
-    tokensCharged: charge.tokenCost,
-    amountPaid: charge.price,
+    status: "SUBMITTED",
+    tokensCharged: access.tokensRequired,
+    amountPaid: 0,
+    stripeSessionId: null,
   };
 
   const saved = await prisma.$transaction(async (tx) => {
@@ -116,6 +116,7 @@ const createQuote = async (tradesmanId, jobId, payload) => {
           ...quoteData,
           images: images.length ? { create: images.map((url) => ({ url })) } : undefined,
         },
+        include: quoteInclude,
       });
     } else {
       quote = await tx.quote.create({
@@ -125,61 +126,22 @@ const createQuote = async (tradesmanId, jobId, payload) => {
           ...quoteData,
           images: images.length ? { create: images.map((url) => ({ url })) } : undefined,
         },
+        include: quoteInclude,
       });
     }
     return quote;
   });
 
-  const tradesman = await prisma.user.findUnique({
-    where: { id: tradesmanId },
-    select: { email: true },
-  });
-
-  const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    customer_email: tradesman?.email,
-    line_items: [
-      {
-        price_data: {
-          currency: "gbp",
-          unit_amount: Math.round(Number(charge.price) * 100),
-          product_data: {
-            name: `Quote lead — ${charge.tokenCost} tokens`,
-            description: `${charge.rule.name} for job ${job.jobCode || job.title}`,
-          },
-        },
-        quantity: 1,
-      },
-    ],
-    client_reference_id: saved.id,
-    metadata: {
-      type: "QUOTE",
-      quoteId: saved.id,
-      jobId,
-      tradesmanId,
-      tokenCost: String(charge.tokenCost),
-    },
-    success_url: `${env.publicBaseUrl.replace(/\/$/, "")}/api/quotes/stripe/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url:
-      process.env.STRIPE_QUOTE_CANCEL_URL ||
-      `${env.frontendUrl.replace(/\/$/, "")}/jobs/${jobId}?status=cancelled`,
-  });
-
-  await prisma.quote.update({
-    where: { id: saved.id },
-    data: { stripeSessionId: session.id },
+  await ensureConversation({
+    customerId: job.customerId,
+    tradesmanId,
+    jobId,
   });
 
   return {
-    quoteId: saved.id,
-    checkoutUrl: session.url,
-    sessionId: session.id,
-    tokensCharged: charge.tokenCost,
-    amountPaid: charge.price,
-    tokenRule: charge.rule.name,
-    publishableKey: env.stripePublishableKey,
+    ...serializeQuote(saved, { includeCustomerContact: true }),
+    tokensDeducted: access.tokensCharged,
+    tokenBalance: access.tokenBalance,
   };
 };
 

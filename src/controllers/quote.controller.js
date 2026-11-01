@@ -5,11 +5,11 @@ const bookingService = require("../services/booking.service");
 const env = require("../config/env");
 
 const createQuote = asyncHandler(async (req, res) => {
-  const checkout = await quoteService.createQuote(req.user.id, req.params.id, req.body);
+  const quote = await quoteService.createQuote(req.user.id, req.params.id, req.body);
   return success(res, {
     statusCode: 201,
-    message: "Checkout created. Pay to submit this quote.",
-    data: checkout,
+    message: "Quote sent successfully",
+    data: quote,
   });
 });
 
