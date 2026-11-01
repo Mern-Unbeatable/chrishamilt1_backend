@@ -1,6 +1,7 @@
 const prisma = require("../config/prisma");
 const { toNumber } = require("../utils/user");
 const { serializeProfile } = require("../utils/serialize");
+const { listPurchasedJobs } = require("./job.service");
 
 const monthKey = (date) => {
   const year = date.getFullYear();
@@ -43,6 +44,7 @@ const getDashboard = async (tradesmanId) => {
     unreadMessages,
     earningRows,
     completedJobRows,
+    purchasedJobs,
   ] = await Promise.all([
     prisma.user.findUnique({
       where: { id: tradesmanId },
@@ -77,6 +79,7 @@ const getDashboard = async (tradesmanId) => {
       where: { tradesmanId, status: "COMPLETED", updatedAt: { gte: chartFrom } },
       select: { updatedAt: true },
     }),
+    listPurchasedJobs(tradesmanId),
   ]);
 
   const months = lastTwelveMonthKeys();
@@ -107,6 +110,8 @@ const getDashboard = async (tradesmanId) => {
     totalEarnings: toNumber(totalEarnings._sum.amount) || 0,
     averageRating: toNumber(user?.tradesmanProfile?.averageRating) || 0,
     unreadMessages,
+    purchasedJobsCount: purchasedJobs.length,
+    purchasedJobs,
     profile: serializeProfile(user?.tradesmanProfile),
     charts: {
       monthlyEarnings: months.map((month) => ({ month, amount: earningsByMonth[month] })),

@@ -406,6 +406,8 @@ JSON raw body still works if you send image URLs instead of files.
 
 No auth. Use this for the **Filter Job Opportunities** screen.
 
+A job disappears from this list after a tradesman buys/unlocks it (`GET /api/jobs/:id`). It then appears on that tradesman’s dashboard / `GET /api/tradesman/jobs` as `purchasedJobs`. Other tradesmen cannot buy it.
+
 First load categories for the Trade Category dropdown:
 
 ```
@@ -759,6 +761,8 @@ Bearer: `{{tradesmanToken}}`
 GET {{baseUrl}}/api/tradesman/dashboard
 ```
 
+Bought jobs are in `data.purchasedJobs` / `data.purchasedJobsCount`. Assigned (hired) jobs stay in `activeJobs`.
+
 ### GET `/api/tradesman/wallet`
 
 Bearer: `{{tradesmanToken}}`
@@ -844,6 +848,8 @@ Bearer: `{{tradesmanToken}}`
 ```
 GET {{baseUrl}}/api/tradesman/jobs?status=ACCEPTED
 ```
+
+`data` = hired/assigned jobs. `purchasedJobs` = jobs this tradesman bought (unlocked). Those bought jobs are hidden from public `GET /api/jobs`.
 
 ### PATCH `/api/tradesman/jobs/:id/status`
 

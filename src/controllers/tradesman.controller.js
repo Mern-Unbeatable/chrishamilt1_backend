@@ -1,7 +1,8 @@
 const asyncHandler = require("../utils/asyncHandler");
-const { success, paginated } = require("../utils/apiResponse");
+const { success } = require("../utils/apiResponse");
 const tradesmanService = require("../services/tradesman.service");
 const bookingService = require("../services/booking.service");
+const jobService = require("../services/job.service");
 
 const getDashboard = asyncHandler(async (req, res) => {
   const dashboard = await tradesmanService.getDashboard(req.user.id);
@@ -19,13 +20,22 @@ const getWallet = asyncHandler(async (req, res) => {
 });
 
 const getMyAssignedJobs = asyncHandler(async (req, res) => {
-  const result = await bookingService.getTradesmanJobs(req.user.id, req.query);
-  return paginated(res, {
+  const [result, purchasedJobs] = await Promise.all([
+    bookingService.getTradesmanJobs(req.user.id, req.query),
+    jobService.listPurchasedJobs(req.user.id),
+  ]);
+
+  return res.status(200).json({
+    success: true,
     message: "My jobs fetched",
     data: result.jobs,
-    page: result.page,
-    limit: result.limit,
-    total: result.total,
+    purchasedJobs,
+    pagination: {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: Math.ceil(result.total / result.limit) || 0,
+    },
   });
 });
 
