@@ -406,7 +406,7 @@ JSON raw body still works if you send image URLs instead of files.
 
 No auth. Use this for the **Filter Job Opportunities** screen.
 
-Only `OPEN` jobs are returned. After a customer confirms/hires a quote, the job becomes `ACCEPTED` and leaves this list. Unlock/quote alone does not hide it.
+Only `OPEN` jobs with fewer than **2 submitted quotes** are returned. After two tradesmen quote, or after the customer hires, the job leaves this list.
 
 First load categories for the Trade Category dropdown:
 
@@ -538,11 +538,17 @@ Bearer required (`{{userToken}}`, `{{tradesmanToken}}`, or `{{adminToken}}`). Gu
 GET {{baseUrl}}/api/jobs/{{jobId}}
 ```
 
-A tradesman opening this page spends the job's `leadPrice` tokens **once**. Repeat views are free. Owner and admin are not charged.
+A tradesman who has **not bought** the job gets a preview only: title, location, budget, category, `leadPrice`. No description, images, requirements, customer details, or `conversationId`. `unlocked` and `canMessage` are `false`. **Tokens are not deducted.**
 
-Response extras for a tradesman: `unlocked`, `tokensCharged` (this request), `tokensRequired`, `tokenBalance`.
+Owner and admin get full details.
 
-Customer contact is shown only to the owner, admin, assigned tradesman, or a tradesman who already unlocked the job.
+Buy with the same route:
+
+```
+GET {{baseUrl}}/api/jobs/{{jobId}}?buy=true
+```
+
+Deducts `leadPrice` tokens **once**, then returns full job details, customer contact, and `conversationId`. Repeat `?buy=true` is free (`tokensCharged: 0`). Frontend: hide Message until `unlocked` / `canMessage` is true.
 
 Not enough tokens:
 
@@ -618,7 +624,9 @@ Then `GET /api/jobs/mine` no longer includes that job. `GET /api/jobs/{{jobId}}`
 
 ## 6. Quotes
 
-Sending a quote does **not** open Stripe. Tokens are taken from the wallet when the tradesman first opens job details (`GET /api/jobs/:id`). If they quote without opening the job first, that same unlock runs here once.
+Sending a quote does **not** open Stripe. The tradesman must **buy the job first** (`GET /api/jobs/:id?buy=true`). Quote without buy returns 400 `Buy this job before sending a quote`.
+
+Each job accepts **2 submitted quotes**. The third quote returns 400 `This job already has two quotations`. After two quotes, the job leaves public `GET /api/jobs`. The customer still sees it on `GET /api/jobs/mine` and must hire one of the two.
 
 ### POST `/api/jobs/:id/quotes` — Tradesman only
 
@@ -1024,15 +1032,19 @@ Set back to `ACTIVE` before more user tests.
 }
 ```
 
-### DELETE `/api/admin/users/:id` — Remove customer or tradesman
+### DELETE `/api/admin/users/:id` — Remove customer, tradesman, or admin
 
-Admin dashboard delete/remove button. Same endpoint for both pages.
+Admin dashboard delete/remove button. Same endpoint for customers, tradesmen, and admins.
 
 ```
 DELETE {{baseUrl}}/api/admin/users/{{userId}}
 ```
 
-Removes the user and related jobs, quotes, bookings, chats, reviews, and token rows. Admin accounts cannot be deleted.
+Removes the user and related jobs, quotes, bookings, chats, reviews, and token rows.
+
+`admin@tradersinloop.co.uk` is the primary admin. Only that account can delete other admins. The primary admin cannot be deleted. Any admin can still delete customers and tradesmen.
+
+Profile/login payload includes `isPrimaryAdmin` so the UI can show the admin-delete button only for the super admin.
 
 ### PATCH `/api/admin/tradesmen/:id/tokens`
 

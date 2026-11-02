@@ -1,7 +1,7 @@
 const prisma = require("../config/prisma");
 const ApiError = require("../utils/apiError");
 const { hashPassword, comparePassword } = require("../utils/password");
-const { splitFullName, sanitizeUser, toNumber } = require("../utils/user");
+const { splitFullName, sanitizeUser, toNumber, isPrimaryAdmin } = require("../utils/user");
 const { serializeProfile } = require("../utils/serialize");
 
 const PROFILE_FIELDS = [
@@ -228,15 +228,21 @@ const setAccountStatus = async (userId, status) => {
 };
 
 const deleteUser = async (userId, actorId) => {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const [user, actor] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    prisma.user.findUnique({ where: { id: actorId } }),
+  ]);
   if (!user) {
     throw new ApiError(404, "User not found");
   }
-  if (user.role === "ADMIN") {
-    throw new ApiError(400, "Admin accounts cannot be deleted");
-  }
   if (userId === actorId) {
     throw new ApiError(400, "You cannot delete your own account");
+  }
+  if (isPrimaryAdmin(user)) {
+    throw new ApiError(403, "The primary admin cannot be deleted");
+  }
+  if (user.role === "ADMIN" && !isPrimaryAdmin(actor)) {
+    throw new ApiError(403, "Only the primary admin can delete other admins");
   }
 
   await prisma.$transaction(async (tx) => {

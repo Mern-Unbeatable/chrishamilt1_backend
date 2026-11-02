@@ -23,8 +23,16 @@ const browseJobs = asyncHandler(async (req, res) => {
 });
 
 const getJob = asyncHandler(async (req, res) => {
-  const job = await jobService.getJobById(req.params.id, req.user);
-  return success(res, { message: "Job details", data: job });
+  const buy = ["true", "1", "yes"].includes(String(req.query.buy || "").toLowerCase());
+  const job = await jobService.getJobById(req.params.id, req.user, { buy });
+  const boughtNow = buy && req.user?.role === "TRADESMAN" && job.tokensCharged;
+  const alreadyBought = buy && req.user?.role === "TRADESMAN" && job.unlocked && !job.tokensCharged;
+  const message = boughtNow
+    ? "Job purchased"
+    : alreadyBought
+      ? "Job already purchased"
+      : "Job details";
+  return success(res, { message, data: job });
 });
 
 const getMyJobs = asyncHandler(async (req, res) => {

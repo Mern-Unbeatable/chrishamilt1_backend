@@ -4,7 +4,7 @@ const { toNumber } = require("../utils/user");
 const { serializeTradesman, serializeCustomer } = require("../utils/serialize");
 const { ensureConversation } = require("./conversation.service");
 const { getStripe } = require("../config/stripe");
-const { unlockJobForTradesman } = require("./job.service");
+const { countSubmittedQuotes, MAX_SUBMITTED_QUOTES, hasJobUnlocked } = require("./job.service");
 
 const quoteInclude = {
   images: true,
@@ -90,7 +90,15 @@ const createQuote = async (tradesmanId, jobId, payload) => {
     throw new ApiError(409, "You have already sent a quote for this job");
   }
 
-  const access = await unlockJobForTradesman(job, tradesmanId);
+  const submittedCount = await countSubmittedQuotes(jobId);
+  if (submittedCount >= MAX_SUBMITTED_QUOTES) {
+    throw new ApiError(400, "This job already has two quotations");
+  }
+
+  const purchased = await hasJobUnlocked(tradesmanId, jobId);
+  if (!purchased) {
+    throw new ApiError(400, "Buy this job before sending a quote");
+  }
   const images = payload.images || [];
   const quoteData = {
     amount: payload.amount,
@@ -101,12 +109,18 @@ const createQuote = async (tradesmanId, jobId, payload) => {
     warranty: payload.warranty || null,
     proposal: payload.proposal || "",
     status: "SUBMITTED",
-    tokensCharged: access.tokensRequired,
+    tokensCharged: Number(job.leadPrice) || 0,
     amountPaid: 0,
     stripeSessionId: null,
   };
 
   const saved = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM jobs WHERE id = CAST(${jobId} AS uuid) FOR UPDATE`;
+    const liveCount = await countSubmittedQuotes(jobId, tx);
+    if (liveCount >= MAX_SUBMITTED_QUOTES) {
+      throw new ApiError(400, "This job already has two quotations");
+    }
+
     let quote;
     if (existing) {
       await tx.quoteImage.deleteMany({ where: { quoteId: existing.id } });
@@ -140,8 +154,7 @@ const createQuote = async (tradesmanId, jobId, payload) => {
 
   return {
     ...serializeQuote(saved, { includeCustomerContact: true }),
-    tokensDeducted: access.tokensCharged,
-    tokenBalance: access.tokenBalance,
+    tokensDeducted: 0,
   };
 };
 

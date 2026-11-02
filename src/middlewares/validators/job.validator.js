@@ -40,7 +40,10 @@ const updateJobValidator = [
   body("images").optional().isArray(),
 ];
 
-const jobIdValidator = [param("id").isUUID().withMessage("Invalid job id")];
+const jobIdValidator = [
+  param("id").isUUID().withMessage("Invalid job id"),
+  query("buy").optional().isIn(["true", "false", "1", "0", "yes", "no"]),
+];
 
 const browseJobsValidator = [
   query("page").optional().isInt({ min: 1 }),

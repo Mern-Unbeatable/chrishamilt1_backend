@@ -136,6 +136,9 @@ const startConversation = async (viewer, { customerId, tradesmanId, jobId } = {}
     if (!customerId) {
       throw new ApiError(400, "customerId is required");
     }
+    if (!jobId) {
+      throw new ApiError(400, "jobId is required");
+    }
     resolvedCustomerId = customerId;
     resolvedTradesmanId = viewer.id;
   } else if (viewer.role === "ADMIN") {
@@ -168,6 +171,19 @@ const startConversation = async (viewer, { customerId, tradesmanId, jobId } = {}
     }
     if (job.customerId !== resolvedCustomerId) {
       throw new ApiError(400, "This job does not belong to that customer");
+    }
+    if (viewer.role === "TRADESMAN" && job.tradesmanId !== viewer.id) {
+      const purchased = await prisma.tokenUsage.findFirst({
+        where: {
+          tradesmanId: viewer.id,
+          jobId,
+          reason: { in: ["JOB_VIEW", "QUOTE"] },
+        },
+        select: { id: true },
+      });
+      if (!purchased) {
+        throw new ApiError(403, "Buy this job before starting a chat");
+      }
     }
   }
 

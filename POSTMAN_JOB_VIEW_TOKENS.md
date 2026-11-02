@@ -11,10 +11,10 @@ Live: `https://api.tradersinloop.co.uk`
 
 1. Tradesman tokens buy kore (Stripe package) ba admin grant pay.
 2. Job list browse e token **kate na**.
-3. Tradesman job details (`GET /api/jobs/:id`) open korle job-er `leadPrice` tokens **ekbar** kate.
-4. Same job abar open korle ar kate na.
-5. Token kom thakle details pabe na — `400`.
-6. Customer contact tokhoni ashe jokhon unlock hoy.
+3. `GET /api/jobs/:id` preview only — description/customer/chat **hide**, token **kate na**.
+4. `GET /api/jobs/:id?buy=true` e `leadPrice` tokens **ekbar** kate, tarpor full details.
+5. Same job abar buy/open korle ar kate na.
+6. Token kom thakle buy `400`. Message button `canMessage: true` hole dekhabe.
 
 Owner / admin charge hoy na.
 
@@ -204,7 +204,7 @@ Wallet same thakbe. List e customer phone/email ashe na. `leadPrice` dekhabe kot
 
 ---
 
-## 7. Open job details — tokens deduct
+## 7. Open job details — preview, no deduct
 
 Bearer: `{{tradesmanToken}}`
 
@@ -212,16 +212,27 @@ Bearer: `{{tradesmanToken}}`
 GET {{baseUrl}}/api/jobs/{{jobId}}
 ```
 
-First time expected:
+Wallet same. `unlocked` / `canMessage` **false**. `customer` **null**. `description` **null**.
+
+---
+
+## 8. Buy the job — tokens deduct
+
+Bearer: `{{tradesmanToken}}`
+
+```
+GET {{baseUrl}}/api/jobs/{{jobId}}?buy=true
+```
 
 ```json
 {
   "success": true,
-  "message": "Job details",
+  "message": "Job purchased",
   "data": {
     "id": "{{jobId}}",
     "leadPrice": 40,
     "unlocked": true,
+    "canMessage": true,
     "tokensCharged": 40,
     "tokensRequired": 40,
     "tokenBalance": 60,
@@ -233,20 +244,7 @@ First time expected:
 }
 ```
 
-`tokensCharged` = ei request e koto kata.  
-`tokenBalance` = unlock er por baki tokens.
-
----
-
-## 8. Open the same job again — no deduct
-
-Bearer: `{{tradesmanToken}}`
-
-```
-GET {{baseUrl}}/api/jobs/{{jobId}}
-```
-
-`tokensCharged` **0**. `unlocked` **true**. Wallet ar kome na.
+Buy again: `tokensCharged` **0**. Then `GET /api/jobs/{{jobId}}` full details, no extra charge.
 
 ---
 
@@ -272,7 +270,7 @@ Notun job dao jeno `leadPrice` wallet theke beshi hoy. Or tradesman er balance 0
 Bearer: `{{tradesmanToken}}`
 
 ```
-GET {{baseUrl}}/api/jobs/{{otherJobId}}
+GET {{baseUrl}}/api/jobs/{{otherJobId}}?buy=true
 ```
 
 Expected:
@@ -326,10 +324,11 @@ Details na khule quote dile o same unlock ekbar cholbe (token kate), then quote 
 3. Admin grant tokens **or** package checkout  
 4. POST job (or pick an open job)  
 5. GET jobs list — wallet unchanged  
-6. GET job details — `tokensCharged` > 0  
-7. GET job details again — `tokensCharged` = 0  
-8. GET wallet (after)  
-9. Optional: POST quote  
+6. GET job details — preview, wallet unchanged  
+7. GET job details `?buy=true` — `tokensCharged` > 0  
+8. GET job details — full, `unlocked` true  
+9. GET wallet (after)  
+10. Optional: POST quote  
 
 ---
 

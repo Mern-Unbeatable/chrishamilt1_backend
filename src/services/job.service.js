@@ -6,9 +6,45 @@ const tokenRuleService = require("./tokenRule.service");
 const { ensureConversation } = require("./conversation.service");
 
 const JOB_UNLOCK_REASONS = ["JOB_VIEW", "QUOTE"];
+const MAX_SUBMITTED_QUOTES = 2;
 
-const serializeJob = (job, { includeContact = false, unlocked = false } = {}) => {
+const serializeJob = (
+  job,
+  { includeContact = false, unlocked = false, submittedQuoteCount, preview = false } = {}
+) => {
   if (!job) return null;
+
+  const quoteCount = submittedQuoteCount || 0;
+  const leadPrice = toNumber(job.leadPrice);
+  const tokensRequired = Number(leadPrice) || 0;
+
+  if (preview) {
+    return {
+      id: job.id,
+      jobCode: job.jobCode,
+      title: job.title,
+      location: job.location,
+      city: job.city,
+      status: job.status,
+      urgency: job.urgency,
+      budgetMin: toNumber(job.budgetMin),
+      budgetMax: toNumber(job.budgetMax),
+      leadPrice,
+      category: job.category || null,
+      createdAt: job.createdAt,
+      unlocked: false,
+      canMessage: false,
+      submittedQuoteCount: quoteCount,
+      quotesRemaining: Math.max(0, MAX_SUBMITTED_QUOTES - quoteCount),
+      tokensRequired,
+      customer: null,
+      description: null,
+      specialNotes: null,
+      requirements: [],
+      images: [],
+      conversationId: null,
+    };
+  }
 
   const customer = job.customer
     ? {
@@ -29,8 +65,12 @@ const serializeJob = (job, { includeContact = false, unlocked = false } = {}) =>
     ...job,
     budgetMin: toNumber(job.budgetMin),
     budgetMax: toNumber(job.budgetMax),
-    leadPrice: toNumber(job.leadPrice),
+    leadPrice,
     unlocked,
+    canMessage: unlocked,
+    submittedQuoteCount: quoteCount,
+    quotesRemaining: Math.max(0, MAX_SUBMITTED_QUOTES - quoteCount),
+    tokensRequired,
     customer,
     tradesman: job.tradesman
       ? {
@@ -52,6 +92,32 @@ const generateJobCode = async () => {
 };
 
 const resolveLeadPrice = (budgetMax) => tokenRuleService.resolveLeadPrice(budgetMax);
+
+const countSubmittedQuotes = (jobId, db = prisma) =>
+  db.quote.count({
+    where: { jobId, status: "SUBMITTED" },
+  });
+
+const listJobIdsAtQuoteLimit = async () => {
+  const grouped = await prisma.quote.groupBy({
+    by: ["jobId"],
+    where: { status: "SUBMITTED" },
+    _count: { jobId: true },
+  });
+  return grouped
+    .filter((row) => row._count.jobId >= MAX_SUBMITTED_QUOTES)
+    .map((row) => row.jobId);
+};
+
+const submittedQuoteCountsByJob = async (jobIds) => {
+  if (!jobIds.length) return {};
+  const grouped = await prisma.quote.groupBy({
+    by: ["jobId"],
+    where: { jobId: { in: jobIds }, status: "SUBMITTED" },
+    _count: { jobId: true },
+  });
+  return Object.fromEntries(grouped.map((row) => [row.jobId, row._count.jobId]));
+};
 
 const canViewContact = (viewer, job, unlocked = false) => {
   if (!viewer) return false;
@@ -283,9 +349,12 @@ const browseJobs = async (query = {}, viewer = null) => {
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 10;
   const skip = (page - 1) * limit;
+  const filledJobIds =
+    !query.status || query.status === "OPEN" ? await listJobIdsAtQuoteLimit() : [];
 
   const where = {
     status: query.status || "OPEN",
+    ...(filledJobIds.length ? { id: { notIn: filledJobIds } } : {}),
     ...(query.urgency ? { urgency: query.urgency } : {}),
     ...(query.location
       ? { location: { contains: query.location, mode: "insensitive" } }
@@ -330,6 +399,8 @@ const browseJobs = async (query = {}, viewer = null) => {
     prisma.job.count({ where }),
   ]);
 
+  const quoteCounts = await submittedQuoteCountsByJob(jobs.map((job) => job.id));
+
   let unlockedIds = new Set();
   if (viewer?.role === "TRADESMAN" && jobs.length) {
     const unlocks = await prisma.tokenUsage.findMany({
@@ -353,6 +424,8 @@ const browseJobs = async (query = {}, viewer = null) => {
       return serializeJob(job, {
         includeContact: canViewContact(viewer, job, unlocked),
         unlocked,
+        preview: viewer?.role === "TRADESMAN" && !unlocked,
+        submittedQuoteCount: quoteCounts[job.id] || 0,
       });
     }),
     total,
@@ -361,7 +434,7 @@ const browseJobs = async (query = {}, viewer = null) => {
   };
 };
 
-const getJobById = async (id, viewer = null) => {
+const getJobById = async (id, viewer = null, { buy = false } = {}) => {
   const job = await prisma.job.findUnique({
     where: { id },
     include: {
@@ -381,10 +454,9 @@ const getJobById = async (id, viewer = null) => {
   const isOwner = viewer?.id === job.customerId;
   const isAdmin = viewer?.role === "ADMIN";
   const isAssigned = viewer?.role === "TRADESMAN" && viewer.id === job.tradesmanId;
-  const shouldUnlock =
-    viewer?.role === "TRADESMAN" && !isOwner && !isAdmin && !isAssigned;
+  const isTradesman = viewer?.role === "TRADESMAN" && !isOwner;
 
-  let access = {
+  let purchase = {
     unlocked: isOwner || isAdmin || isAssigned,
     charged: false,
     tokensCharged: 0,
@@ -393,23 +465,47 @@ const getJobById = async (id, viewer = null) => {
     conversationId: null,
   };
 
-  if (shouldUnlock) {
-    access = await unlockJobForTradesman(job, viewer.id);
-  } else if (isAssigned) {
-    const conversation = await openJobConversation(job, viewer.id);
-    access.conversationId = conversation?.id || null;
+  if (isTradesman && buy) {
+    purchase = await unlockJobForTradesman(job, viewer.id);
+  } else if (isTradesman) {
+    const existing = await findJobUnlock(prisma, viewer.id, job.id);
+    purchase.unlocked = isAssigned || Boolean(existing);
+    purchase.tokensRequired = existing?.tokens || Number(job.leadPrice) || 0;
+  }
+
+  const unlocked = purchase.unlocked;
+  const preview = isTradesman && !unlocked;
+  const submittedQuoteCount = await countSubmittedQuotes(job.id);
+
+  let conversationId = purchase.conversationId || null;
+  if (unlocked && isTradesman && !conversationId) {
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        customerId: job.customerId,
+        tradesmanId: viewer.id,
+        jobId: job.id,
+      },
+      select: { id: true },
+    });
+    conversationId = conversation?.id || null;
   }
 
   return {
     ...serializeJob(job, {
-      includeContact: canViewContact(viewer, job, access.unlocked),
-      unlocked: access.unlocked,
+      includeContact: canViewContact(viewer, job, unlocked),
+      unlocked,
+      preview,
+      submittedQuoteCount,
     }),
-    tokensCharged: access.tokensCharged,
-    tokensRequired: access.tokensRequired,
-    tokenBalance: access.tokenBalance,
-    conversationId: access.conversationId || null,
+    tokensCharged: purchase.tokensCharged,
+    tokensRequired: purchase.tokensRequired,
+    tokenBalance: purchase.tokenBalance,
+    conversationId,
   };
+};
+
+const hasJobUnlocked = async (tradesmanId, jobId) => {
+  return Boolean(await findJobUnlock(prisma, tradesmanId, jobId));
 };
 
 const getMyJobs = async (customerId, query = {}) => {
@@ -438,8 +534,16 @@ const getMyJobs = async (customerId, query = {}) => {
     prisma.job.count({ where }),
   ]);
 
+  const quoteCounts = await submittedQuoteCountsByJob(jobs.map((job) => job.id));
+
   return {
-    jobs: jobs.map((job) => serializeJob(job, { includeContact: true, unlocked: true })),
+    jobs: jobs.map((job) =>
+      serializeJob(job, {
+        includeContact: true,
+        unlocked: true,
+        submittedQuoteCount: quoteCounts[job.id] || 0,
+      })
+    ),
     total,
     page,
     limit,
@@ -595,5 +699,8 @@ module.exports = {
   cancelJob,
   deleteJob,
   unlockJobForTradesman,
+  hasJobUnlocked,
   listPurchasedJobs,
+  countSubmittedQuotes,
+  MAX_SUBMITTED_QUOTES,
 };

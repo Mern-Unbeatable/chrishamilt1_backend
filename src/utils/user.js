@@ -8,10 +8,20 @@ const splitFullName = (fullName) => {
   return { firstName, lastName };
 };
 
+const env = require("../config/env");
+
+const isPrimaryAdmin = (user) => {
+  if (!user || user.role !== "ADMIN") return false;
+  return String(user.email || "").trim().toLowerCase() === env.primaryAdminEmail;
+};
+
 const sanitizeUser = (user) => {
   if (!user) return null;
   const { password, passwordResetToken, passwordResetExpires, ...safe } = user;
-  return safe;
+  return {
+    ...safe,
+    isPrimaryAdmin: isPrimaryAdmin(user),
+  };
 };
 
 const toNumber = (value) => {
@@ -23,4 +33,4 @@ const toNumber = (value) => {
   return Number.isNaN(parsed) ? value : parsed;
 };
 
-module.exports = { splitFullName, sanitizeUser, toNumber };
+module.exports = { splitFullName, sanitizeUser, toNumber, isPrimaryAdmin };

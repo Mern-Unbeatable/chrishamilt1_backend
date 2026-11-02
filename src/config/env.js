@@ -39,4 +39,9 @@ module.exports = {
     process.env.SMTP_FROM ||
     process.env.SMTP_USER ||
     "Traders In Loop <admin@tradersinloop.co.uk>",
+  primaryAdminEmail: (
+    process.env.PRIMARY_ADMIN_EMAIL || "admin@tradersinloop.co.uk"
+  )
+    .trim()
+    .toLowerCase(),
 };
