@@ -43,6 +43,17 @@ const getCustomer = asyncHandler(async (req, res) => {
   return success(res, { message: "Customer details", data: customer });
 });
 
+const listAdmins = asyncHandler(async (req, res) => {
+  const result = await userService.listAdmins(req.user, req.query);
+  return paginated(res, {
+    message: "Admins fetched",
+    data: result.users,
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+  });
+});
+
 const listTradesmen = asyncHandler(async (req, res) => {
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
@@ -89,6 +100,7 @@ module.exports = {
   changePassword,
   listCustomers,
   getCustomer,
+  listAdmins,
   listTradesmen,
   getTradesman,
   setAccountStatus,

@@ -984,6 +984,16 @@ Admin only. Use this for the admin **Dashboard** screen.
 
 Token sales / revenue / top buyers use **completed** token purchases. Those stay `0` until tradesmen buy packages.
 
+### GET `/api/admin/admins` — Super admin only
+
+Bearer: `{{adminToken}}` for `admin@tradersinloop.co.uk`
+
+```
+GET {{baseUrl}}/api/admin/admins?page=1&limit=10
+```
+
+Lists other admins. The primary admin is not included. Other admins get 403.
+
 ### GET `/api/admin/customers`
 
 ```

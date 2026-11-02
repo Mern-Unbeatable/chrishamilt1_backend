@@ -67,11 +67,12 @@ const changePassword = async (userId, { currentPassword, newPassword }) => {
   });
 };
 
-const listUsers = async ({ role, status, page = 1, limit = 10, search }) => {
+const listUsers = async ({ role, status, page = 1, limit = 10, search, excludeId }) => {
   const skip = (page - 1) * limit;
   const where = {
     ...(role ? { role } : {}),
     ...(status ? { status } : {}),
+    ...(excludeId ? { id: { not: excludeId } } : {}),
     ...(search
       ? {
           OR: [
@@ -103,6 +104,21 @@ const listUsers = async ({ role, status, page = 1, limit = 10, search }) => {
     page,
     limit,
   };
+};
+
+const listAdmins = async (actor, query = {}) => {
+  if (!isPrimaryAdmin(actor)) {
+    throw new ApiError(403, "Only the primary admin can view admins");
+  }
+
+  return listUsers({
+    role: "ADMIN",
+    status: query.status,
+    search: query.search,
+    page: Number(query.page) || 1,
+    limit: Number(query.limit) || 10,
+    excludeId: actor.id,
+  });
 };
 
 const getCustomerById = async (id) => {
@@ -298,6 +314,7 @@ module.exports = {
   updateProfile,
   changePassword,
   listUsers,
+  listAdmins,
   getCustomerById,
   getTradesmanById,
   setAccountStatus,

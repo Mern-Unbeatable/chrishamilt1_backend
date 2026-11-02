@@ -26,6 +26,7 @@ const router = express.Router();
 router.use(authenticate, authorize("ADMIN"));
 
 router.get("/dashboard", adminController.getDashboard);
+router.get("/admins", userController.listAdmins);
 router.get("/customers", userController.listCustomers);
 router.get(
   "/customers/:id",
