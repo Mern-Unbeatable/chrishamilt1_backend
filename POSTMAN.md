@@ -408,6 +408,8 @@ No auth. Use this for the **Filter Job Opportunities** screen.
 
 Only `OPEN` jobs with fewer than **2 submitted quotes** are returned. After two tradesmen quote, or after the customer hires, the job leaves this list.
 
+Logged-in tradesman newsfeed also hides jobs that **this** tradesman already bought or quoted. Use Bearer `{{tradesmanToken}}` on `GET /api/jobs`. Other tradesmen still see those jobs.
+
 First load categories for the Trade Category dropdown:
 
 ```

@@ -352,9 +352,31 @@ const browseJobs = async (query = {}, viewer = null) => {
   const filledJobIds =
     !query.status || query.status === "OPEN" ? await listJobIdsAtQuoteLimit() : [];
 
+  const hiddenForViewer = new Set(filledJobIds);
+  if (viewer?.role === "TRADESMAN") {
+    const [unlocks, quotes] = await Promise.all([
+      prisma.tokenUsage.findMany({
+        where: {
+          tradesmanId: viewer.id,
+          jobId: { not: null },
+          reason: { in: JOB_UNLOCK_REASONS },
+        },
+        select: { jobId: true },
+      }),
+      prisma.quote.findMany({
+        where: { tradesmanId: viewer.id },
+        select: { jobId: true },
+      }),
+    ]);
+    unlocks.forEach((row) => hiddenForViewer.add(row.jobId));
+    quotes.forEach((row) => hiddenForViewer.add(row.jobId));
+  }
+
+  const excludeIds = [...hiddenForViewer].filter(Boolean);
+
   const where = {
     status: query.status || "OPEN",
-    ...(filledJobIds.length ? { id: { notIn: filledJobIds } } : {}),
+    ...(excludeIds.length ? { id: { notIn: excludeIds } } : {}),
     ...(query.urgency ? { urgency: query.urgency } : {}),
     ...(query.location
       ? { location: { contains: query.location, mode: "insensitive" } }
