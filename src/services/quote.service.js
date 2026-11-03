@@ -4,7 +4,11 @@ const { toNumber } = require("../utils/user");
 const { serializeTradesman, serializeCustomer } = require("../utils/serialize");
 const { ensureConversation } = require("./conversation.service");
 const { getStripe } = require("../config/stripe");
-const { countSubmittedQuotes, MAX_SUBMITTED_QUOTES, hasJobUnlocked } = require("./job.service");
+const {
+  countSubmittedQuotes,
+  MAX_SUBMITTED_QUOTES,
+  unlockJobForTradesman,
+} = require("./job.service");
 
 const quoteInclude = {
   images: true,
@@ -95,10 +99,7 @@ const createQuote = async (tradesmanId, jobId, payload) => {
     throw new ApiError(400, "This job already has two quotations");
   }
 
-  const purchased = await hasJobUnlocked(tradesmanId, jobId);
-  if (!purchased) {
-    throw new ApiError(400, "Buy this job before sending a quote");
-  }
+  const access = await unlockJobForTradesman(job, tradesmanId);
   const images = payload.images || [];
   const quoteData = {
     amount: payload.amount,
@@ -109,13 +110,16 @@ const createQuote = async (tradesmanId, jobId, payload) => {
     warranty: payload.warranty || null,
     proposal: payload.proposal || "",
     status: "SUBMITTED",
-    tokensCharged: Number(job.leadPrice) || 0,
+    tokensCharged: access.tokensRequired,
     amountPaid: 0,
     stripeSessionId: null,
   };
 
   const saved = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM jobs WHERE id = CAST(${jobId} AS uuid) FOR UPDATE`;
+    await tx.job.update({
+      where: { id: jobId },
+      data: { updatedAt: new Date() },
+    });
     const liveCount = await countSubmittedQuotes(jobId, tx);
     if (liveCount >= MAX_SUBMITTED_QUOTES) {
       throw new ApiError(400, "This job already has two quotations");
@@ -154,7 +158,8 @@ const createQuote = async (tradesmanId, jobId, payload) => {
 
   return {
     ...serializeQuote(saved, { includeCustomerContact: true }),
-    tokensDeducted: 0,
+    tokensDeducted: access.tokensCharged,
+    tokenBalance: access.tokenBalance,
   };
 };
 

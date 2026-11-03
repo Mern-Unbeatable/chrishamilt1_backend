@@ -626,7 +626,7 @@ Then `GET /api/jobs/mine` no longer includes that job. `GET /api/jobs/{{jobId}}`
 
 ## 6. Quotes
 
-Sending a quote does **not** open Stripe. The tradesman must **buy the job first** (`GET /api/jobs/:id?buy=true`). Quote without buy returns 400 `Buy this job before sending a quote`.
+Sending a quote does **not** open Stripe. `POST /api/jobs/:id/quotes` deducts `leadPrice` tokens **once** and submits the quote. Extra `?buy=true` is not required. If they already bought, quote does not charge again.
 
 Each job accepts **2 submitted quotes**. The third quote returns 400 `This job already has two quotations`. After two quotes, the job leaves public `GET /api/jobs`. The customer still sees it on `GET /api/jobs/mine` and must hire one of the two.
 
