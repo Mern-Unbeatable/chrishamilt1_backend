@@ -1,11 +1,11 @@
 {
   "name": "traders-in-loop-api",
   "version": "1.0.0",
-  "description": "Traders In Loop — marketplace API connecting customers with tradesmen",
+  "description": "Traders In Loop \u2014 marketplace API connecting customers with tradesmen",
   "main": "src/server.js",
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
+    "dev": "node init && nodemon src/server.js",
+    "start": "node init && node src/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

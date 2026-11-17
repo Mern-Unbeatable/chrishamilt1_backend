@@ -15,8 +15,8 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   databaseUrl: process.env.DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "40d",
-  jwtRememberExpiresIn: process.env.JWT_REMEMBER_EXPIRES_IN || "40d",
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || "200d",
+  jwtRememberExpiresIn: process.env.JWT_REMEMBER_EXPIRES_IN || "200d",
   bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 10,
   corsOrigin: process.env.CORS_ORIGIN || "*",
   publicBaseUrl:
